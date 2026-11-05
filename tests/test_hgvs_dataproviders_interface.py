@@ -4,7 +4,7 @@ import pickle
 
 import pytest
 
-from hgvs.dataproviders.interface import Interface
+from hgvs.dataproviders.interface import _RESULT_MODELS, Interface
 from hgvs.dataproviders.models import TranscriptInfo
 from hgvs.decorators.lru_cache import _make_key
 from hgvs.exceptions import HGVSDataNotAvailableError
@@ -137,3 +137,7 @@ def test_legacy_cache_entry_with_unknown_keys_fails_on_load(tmp_path):
     _write_legacy_cache(cache, {**TX_INFO_DICT, "bogus": 1})
     with pytest.raises(TypeError, match="cannot convert cached result"):
         FakeProvider(None, mode="run", cache=str(cache))
+
+
+def test_result_models_are_read_from_return_annotations():
+    assert {"get_tx_info": TranscriptInfo} == _RESULT_MODELS

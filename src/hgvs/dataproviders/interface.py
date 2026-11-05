@@ -1,9 +1,11 @@
 """Defines the abstract data provider interface"""
 
 import abc
+import dataclasses
 import functools
 import logging
 import os
+import typing
 import warnings
 from typing import ClassVar
 
@@ -15,9 +17,6 @@ from ..utils.PersistentDict import PersistentDict
 from .models import TranscriptInfo
 
 _logger = logging.getLogger(__name__)
-
-# Provider methods whose results are data models, and the model each returns.
-_RESULT_MODELS: dict[str, type] = {"get_tx_info": TranscriptInfo}
 
 
 def _cached_method_name(key):
@@ -260,6 +259,20 @@ class Interface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_tx_mapping_options(self, tx_ac):
         pass
+
+
+def _result_models(cls):
+    """Map each abstract method whose return annotation is a data model to that model."""
+    models = {}
+    for name in cls.__abstractmethods__:
+        rtype = typing.get_type_hints(getattr(cls, name)).get("return")
+        if isinstance(rtype, type) and dataclasses.is_dataclass(rtype):
+            models[name] = rtype
+    return models
+
+
+# Provider methods whose results are data models, read from the annotations above.
+_RESULT_MODELS = _result_models(Interface)
 
 
 # <LICENSE>
