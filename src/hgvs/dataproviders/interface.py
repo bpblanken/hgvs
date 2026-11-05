@@ -16,6 +16,39 @@ from .models import TranscriptInfo
 
 _logger = logging.getLogger(__name__)
 
+# Provider methods whose results are data models, and the model each returns.
+_RESULT_MODELS: dict[str, type] = {"get_tx_info": TranscriptInfo}
+
+
+def _cached_method_name(key):
+    """Return the provider method name recorded in an lru_cache key, or None."""
+    try:
+        parts = list(key)
+        return parts[parts.index("__func__") + 1]
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def _upgrade_legacy_cache(cache):
+    """Convert cached dict results, recorded before data models existed, to models.
+
+    Runs once when a persistent cache is opened, so caches written by earlier
+    hgvs releases keep working in every cache mode.  In learn mode the
+    converted entries are written back to the file on the next sync.
+    """
+    for key, value in list(cache.items()):
+        model = _RESULT_MODELS.get(_cached_method_name(key))
+        if model is None or isinstance(value, model):
+            continue
+        if not isinstance(value, dict):
+            msg = f"cached result for {key!r} is {type(value).__name__}; expected {model.__name__}"
+            raise TypeError(msg)
+        try:
+            cache[key] = model(**value)
+        except TypeError as e:
+            msg = f"cannot convert cached result for {key!r} to {model.__name__}: {e}"
+            raise TypeError(msg) from e
+
 
 def _coerce_to_model(method, model):
     """Wrap a provider method so that a legacy dict result becomes ``model``.
@@ -104,6 +137,7 @@ class Interface(metaclass=abc.ABCMeta):
                 self.cache = PersistentDict(cache, flag="c")
             else:
                 self.cache = PersistentDict(cache, flag="r")
+            _upgrade_legacy_cache(self.cache)
 
         maxsize = hgvs.global_config.lru_cache.maxsize
         if "PYTEST_CURRENT_TEST" in os.environ:
@@ -142,7 +176,7 @@ class Interface(metaclass=abc.ABCMeta):
             self.get_tx_identity_info
         )
         self.get_tx_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
-            _coerce_to_model(self.get_tx_info, TranscriptInfo)
+            _coerce_to_model(self.get_tx_info, _RESULT_MODELS["get_tx_info"])
         )
         self.get_tx_mapping_options = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_mapping_options
