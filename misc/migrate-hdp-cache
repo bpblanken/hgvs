@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+"""Convert recorded data provider results in the test cache to a model class.
+
+The test suite replays data provider calls from a pickled cache
+(tests/data/cache-py3.hdp) so it can run without a database.  When a
+provider method changes from returning dicts to returning a model, the
+recorded results for that method must be converted too, or replay mode
+hands the old dicts to callers.
+
+This script rewrites the cache in place.  Entries that are already the
+model are left alone, so it is safe to run twice.  Values that are lists
+of dicts are converted element-wise.
+
+Example::
+
+    misc/migrate-hdp-cache get_tx_info hgvs.dataproviders.models.TranscriptInfo
+
+"""
+
+import argparse
+import dataclasses
+import importlib
+import pickle
+import sys
+from pathlib import Path
+
+DEFAULT_CACHE = Path(__file__).resolve().parents[1] / "tests" / "data" / "cache-py3.hdp"
+PICKLE_PROTOCOL = 4  # matches hgvs.utils.PersistentDict
+
+
+def _import_model(dotted):
+    module_name, _, class_name = dotted.rpartition(".")
+    if not module_name:
+        msg = f"model must be a dotted path such as hgvs.dataproviders.models.TranscriptInfo, got {dotted!r}"
+        raise SystemExit(msg)
+    return getattr(importlib.import_module(module_name), class_name)
+
+
+def _method_of(key):
+    """Return the provider method name recorded in a cache key, or None."""
+    if not isinstance(key, list):
+        return None
+    parts = list(key)
+    try:
+        return parts[parts.index("__func__") + 1]
+    except (ValueError, IndexError):
+        return None
+
+
+def _convert(value, model, fields):
+    if isinstance(value, model):
+        return value, False
+    if isinstance(value, dict):
+        extra = set(value) ^ fields
+        if extra:
+            msg = f"recorded dict and {model.__name__} fields differ on {sorted(extra)}: {value}"
+            raise SystemExit(msg)
+        return model(**value), True
+    if isinstance(value, list):
+        converted = [_convert(v, model, fields) for v in value]
+        return [v for v, _ in converted], any(c for _, c in converted)
+    msg = f"cannot convert value of type {type(value).__name__}: {value!r}"
+    raise SystemExit(msg)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    ap.add_argument("method", help="provider method name, e.g. get_tx_info")
+    ap.add_argument("model", help="dotted path to the model class")
+    ap.add_argument("--cache", type=Path, default=DEFAULT_CACHE, help=f"default: {DEFAULT_CACHE}")
+    ap.add_argument(
+        "--dry-run", action="store_true", help="report what would change; write nothing"
+    )
+    args = ap.parse_args(argv)
+
+    model = _import_model(args.model)
+    fields = {f.name for f in dataclasses.fields(model)}
+
+    with args.cache.open("rb") as f:
+        cache = pickle.load(f)  # noqa: S301 - our own test fixture
+
+    seen = converted = 0
+    for key, value in cache.items():
+        if _method_of(key) != args.method:
+            continue
+        seen += 1
+        new_value, changed = _convert(value, model, fields)
+        if changed:
+            cache[key] = new_value
+            converted += 1
+
+    print(f"{args.method}: {seen} recorded calls, {converted} converted to {model.__name__}")
+    if seen == 0:
+        print("no entries found for that method; check the name", file=sys.stderr)
+        return 1
+    if args.dry_run or converted == 0:
+        return 0
+
+    with args.cache.open("wb") as f:
+        pickle.dump(dict(cache), f, PICKLE_PROTOCOL)
+    print(f"wrote {args.cache}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

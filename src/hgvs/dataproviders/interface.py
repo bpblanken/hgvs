@@ -1,15 +1,60 @@
 """Defines the abstract data provider interface"""
 
 import abc
+import functools
 import logging
 import os
+import warnings
+from typing import ClassVar
 
 import hgvs
 
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
+from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
+from .models import TranscriptInfo
 
 _logger = logging.getLogger(__name__)
+
+
+def _coerce_to_model(method, model):
+    """Wrap a provider method so that a legacy dict result becomes ``model``.
+
+    Before data models existed, providers returned plain dicts keyed by
+    the UTA column names, and some returned ``None`` for "not found".
+    Providers that still do so keep working for now: dicts are converted
+    with a :class:`DeprecationWarning`, and ``None`` raises
+    :class:`HGVSDataNotAvailableError` as the mappers used to.  This
+    adapter will be removed in a future release.
+    """
+
+    @functools.wraps(method)
+    def wrapper(*args, **kwargs):
+        result = method(*args, **kwargs)
+        if isinstance(result, model):
+            return result
+        provider = type(method.__self__).__name__
+        if result is None:
+            msg = f"{provider}.{method.__name__}{args} returned no data"
+            raise HGVSDataNotAvailableError(msg)
+        if isinstance(result, dict):
+            warnings.warn(
+                f"{provider}.{method.__name__} returned a dict; data providers must return"
+                f" hgvs.dataproviders.models.{model.__name__}. Dict results are deprecated"
+                " and support will be removed in a future release.",
+                DeprecationWarning,
+                # attribute the warning to the caller of hdp.<method>(), skipping
+                # this wrapper and the lru_cache wrapper around it
+                stacklevel=3,
+            )
+            return model(**result)
+        msg = (
+            f"{provider}.{method.__name__} returned {type(result).__name__};"
+            f" expected hgvs.dataproviders.models.{model.__name__}"
+        )
+        raise TypeError(msg)
+
+    return wrapper
 
 
 class Interface(metaclass=abc.ABCMeta):
@@ -36,7 +81,7 @@ class Interface(metaclass=abc.ABCMeta):
     """
 
     def interface_version(self):
-        return 4
+        return 5
 
     def __init__(self, mode=None, cache=None):
         """
@@ -97,7 +142,7 @@ class Interface(metaclass=abc.ABCMeta):
             self.get_tx_identity_info
         )
         self.get_tx_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
-            self.get_tx_info
+            _coerce_to_model(self.get_tx_info, TranscriptInfo)
         )
         self.get_tx_mapping_options = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_mapping_options
@@ -124,7 +169,7 @@ class Interface(metaclass=abc.ABCMeta):
     # required_version: what version of the remote schema is required
     # by the subclass? This value is compared to the result of
     # schema_version, which must be implemented by the class.
-    required_version = None
+    required_version: ClassVar[str | None] = None
 
     @abc.abstractmethod
     def data_version(self):
@@ -175,7 +220,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         pass
 
     @abc.abstractmethod
