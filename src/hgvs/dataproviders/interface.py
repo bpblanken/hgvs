@@ -1,11 +1,9 @@
 """Defines the abstract data provider interface"""
 
 import abc
-import dataclasses
 import functools
 import logging
 import os
-import typing
 import warnings
 from typing import ClassVar
 
@@ -19,34 +17,17 @@ from .models import TranscriptInfo
 _logger = logging.getLogger(__name__)
 
 
-def _cached_method_name(key):
-    """Return the provider method name recorded in an lru_cache key, or None."""
-    try:
-        parts = list(key)
-        return parts[parts.index("__func__") + 1]
-    except (TypeError, ValueError, IndexError):
-        return None
+def _to_model(model):
+    """Return a converter for values read from a persistent cache.
 
-
-def _upgrade_legacy_cache(cache):
-    """Convert cached dict results, recorded before data models existed, to models.
-
-    Runs once when a persistent cache is opened, so caches written by earlier
-    hgvs releases keep working in every cache mode.  In learn mode the
-    converted entries are written back to the file on the next sync.
+    Dict results recorded before data models existed become ``model`` as they
+    leave the cache; models pass through untouched.
     """
-    for key, value in list(cache.items()):
-        model = _RESULT_MODELS.get(_cached_method_name(key))
-        if model is None or isinstance(value, model):
-            continue
-        if not isinstance(value, dict):
-            msg = f"cached result for {key!r} is {type(value).__name__}; expected {model.__name__}"
-            raise TypeError(msg)
-        try:
-            cache[key] = model(**value)
-        except TypeError as e:
-            msg = f"cannot convert cached result for {key!r} to {model.__name__}: {e}"
-            raise TypeError(msg) from e
+
+    def convert(value):
+        return value if isinstance(value, model) else model(**value)
+
+    return convert
 
 
 def _coerce_to_model(method, model):
@@ -136,7 +117,6 @@ class Interface(metaclass=abc.ABCMeta):
                 self.cache = PersistentDict(cache, flag="c")
             else:
                 self.cache = PersistentDict(cache, flag="r")
-            _upgrade_legacy_cache(self.cache)
 
         maxsize = hgvs.global_config.lru_cache.maxsize
         if "PYTEST_CURRENT_TEST" in os.environ:
@@ -174,9 +154,9 @@ class Interface(metaclass=abc.ABCMeta):
         self.get_tx_identity_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_identity_info
         )
-        self.get_tx_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
-            _coerce_to_model(self.get_tx_info, _RESULT_MODELS["get_tx_info"])
-        )
+        self.get_tx_info = lru_cache(
+            maxsize=maxsize, mode=self.mode, cache=self.cache, normalize=_to_model(TranscriptInfo)
+        )(_coerce_to_model(self.get_tx_info, TranscriptInfo))
         self.get_tx_mapping_options = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_mapping_options
         )
@@ -259,20 +239,6 @@ class Interface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_tx_mapping_options(self, tx_ac):
         pass
-
-
-def _result_models(cls):
-    """Map each abstract method whose return annotation is a data model to that model."""
-    models = {}
-    for name in cls.__abstractmethods__:
-        rtype = typing.get_type_hints(getattr(cls, name)).get("return")
-        if isinstance(rtype, type) and dataclasses.is_dataclass(rtype):
-            models[name] = rtype
-    return models
-
-
-# Provider methods whose results are data models, read from the annotations above.
-_RESULT_MODELS = _result_models(Interface)
 
 
 # <LICENSE>

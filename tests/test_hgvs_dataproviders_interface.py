@@ -4,7 +4,7 @@ import pickle
 
 import pytest
 
-from hgvs.dataproviders.interface import _RESULT_MODELS, Interface
+from hgvs.dataproviders.interface import Interface
 from hgvs.dataproviders.models import TranscriptInfo
 from hgvs.decorators.lru_cache import _make_key
 from hgvs.exceptions import HGVSDataNotAvailableError
@@ -122,7 +122,7 @@ def _write_legacy_cache(path, tx_info_value):
         pickle.dump(entries, f, 4)
 
 
-def test_legacy_cache_entries_are_upgraded_on_load(tmp_path, recwarn):
+def test_legacy_cache_dict_is_converted_as_it_leaves_the_cache(tmp_path, recwarn):
     cache = tmp_path / "cache.hdp"
     _write_legacy_cache(cache, dict(TX_INFO_DICT))
     hdp = FakeProvider(None, mode="run", cache=str(cache))
@@ -132,12 +132,17 @@ def test_legacy_cache_entries_are_upgraded_on_load(tmp_path, recwarn):
     assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
 
-def test_legacy_cache_entry_with_unknown_keys_fails_on_load(tmp_path):
+def test_legacy_cache_dict_verifies_against_a_model_result(tmp_path):
+    cache = tmp_path / "cache.hdp"
+    _write_legacy_cache(cache, dict(TX_INFO_DICT))
+    hdp = FakeProvider(TX_INFO, mode="verify", cache=str(cache))
+    assert hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign") == TX_INFO
+    assert hdp.calls == 1, "verify mode must call the provider"
+
+
+def test_legacy_cache_dict_with_unknown_keys_fails_on_read(tmp_path):
     cache = tmp_path / "cache.hdp"
     _write_legacy_cache(cache, {**TX_INFO_DICT, "bogus": 1})
-    with pytest.raises(TypeError, match="cannot convert cached result"):
-        FakeProvider(None, mode="run", cache=str(cache))
-
-
-def test_result_models_are_read_from_return_annotations():
-    assert {"get_tx_info": TranscriptInfo} == _RESULT_MODELS
+    hdp = FakeProvider(None, mode="run", cache=str(cache))
+    with pytest.raises(TypeError, match="bogus"):
+        hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
