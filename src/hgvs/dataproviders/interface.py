@@ -8,6 +8,7 @@ from typing import ClassVar
 import hgvs
 
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
+from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
 from .models import TranscriptInfo
 
@@ -265,10 +266,16 @@ class _V4Bridge(Interface):
 
     # -- changed contract: dict results become models ------------------------
 
-    def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         result = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
-        # version 4 allowed None for "not found"; callers check for it
-        return None if result is None else TranscriptInfo(**result)
+        if result is None:
+            # version 4 allowed None for "not found"; version 5 raises
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_info"
+                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
+        return TranscriptInfo(**result)
 
 
 # <LICENSE>
