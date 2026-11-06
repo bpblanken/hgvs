@@ -409,21 +409,21 @@ class UTABase(Interface):
         if len(rows) == 0:
             msg = f"No tx_info for (tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             raise HGVSDataNotAvailableError(msg)
-        if len(rows) > 1:
-            msg = (
-                f"Multiple ({len(rows)}) replies for tx_info(tx_ac="
-                f"{tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
+        if len(rows) == 1:
+            row = rows[0]
+            return TranscriptInfo(
+                tx_ac=row["tx_ac"],
+                alt_ac=row["alt_ac"],
+                alt_aln_method=row["alt_aln_method"],
+                cds_start_i=row["cds_start_i"],
+                cds_end_i=row["cds_end_i"],
+                hgnc=row["hgnc"],
             )
-            raise HGVSError(msg)
-        row = rows[0]
-        return TranscriptInfo(
-            tx_ac=row["tx_ac"],
-            alt_ac=row["alt_ac"],
-            alt_aln_method=row["alt_aln_method"],
-            cds_start_i=row["cds_start_i"],
-            cds_end_i=row["cds_end_i"],
-            hgnc=row["hgnc"],
+        msg = (
+            f"Multiple ({len(rows)}) replies for tx_info(tx_ac="
+            f"{tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
         )
+        raise HGVSError(msg)
 
     def get_tx_mapping_options(self, tx_ac):
         """Return all transcript alignment sets for a given transcript
