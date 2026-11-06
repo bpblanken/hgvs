@@ -4,7 +4,6 @@ import pytest
 
 from hgvs.dataproviders.interface import Interface
 from hgvs.dataproviders.models import TranscriptInfo
-from hgvs.exceptions import HGVSDataNotAvailableError
 
 TX_INFO_DICT = {
     "hgnc": "ATM",
@@ -88,12 +87,9 @@ def test_bridge_converts_dict_tx_info_to_model():
     assert provider.calls == [("get_tx_info", *TX_INFO_ARGS)]
 
 
-def test_bridge_turns_none_tx_info_into_data_not_available():
+def test_bridge_passes_none_tx_info_through():
     hdp = Interface.from_v4(V4Provider(None))
-    with pytest.raises(
-        HGVSDataNotAvailableError, match=r"V4Provider\.get_tx_info.*returned no data"
-    ):
-        hdp.get_tx_info(*TX_INFO_ARGS)
+    assert hdp.get_tx_info(*TX_INFO_ARGS) is None
 
 
 def test_bridge_rejects_dict_with_unknown_keys():
