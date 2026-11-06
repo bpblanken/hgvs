@@ -297,9 +297,6 @@ class Normalizer:
             return float("inf")
         # Get genomic sequence access number for this transcript
         identity_info = self.hdp.get_tx_identity_info(var.ac)
-        if not identity_info:
-            msg = f"No identity info available for {var.ac}"
-            raise HGVSDataNotAvailableError(msg)
         tgt_len = sum(identity_info["lengths"])
         return tgt_len
 

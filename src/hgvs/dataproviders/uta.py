@@ -263,7 +263,9 @@ class UTABase(Interface):
 
     def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
         """
-        return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method), or None if not found
+        return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method)
+
+        :raises HGVSDataNotAvailableError: if no such alignment exists or it is incomplete
 
         :param tx_ac: transcript accession with version (e.g., 'NM_000051.3')
         :type tx_ac: str
@@ -360,6 +362,8 @@ class UTABase(Interface):
 
     def get_tx_identity_info(self, tx_ac):
         """returns features associated with a single transcript.
+
+        :raises HGVSDataNotAvailableError: if no such transcript exists
 
         :param tx_ac: transcript accession with version (e.g., 'NM_199425.2')
         :type tx_ac: str
