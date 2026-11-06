@@ -23,6 +23,7 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
+from .models import TranscriptInfo
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -262,7 +263,9 @@ class UTABase(Interface):
 
     def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
         """
-        return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method), or None if not found
+        return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method)
+
+        :raises HGVSDataNotAvailableError: if no such alignment exists or it is incomplete
 
         :param tx_ac: transcript accession with version (e.g., 'NM_000051.3')
         :type tx_ac: str
@@ -360,6 +363,8 @@ class UTABase(Interface):
     def get_tx_identity_info(self, tx_ac):
         """returns features associated with a single transcript.
 
+        :raises HGVSDataNotAvailableError: if no such transcript exists
+
         :param tx_ac: transcript accession with version (e.g., 'NM_199425.2')
         :type tx_ac: str
 
@@ -380,8 +385,10 @@ class UTABase(Interface):
             raise HGVSDataNotAvailableError(msg)
         return rows[0]
 
-    def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):
-        """return a single transcript info for supplied accession (tx_ac, alt_ac, alt_aln_method), or None if not found
+    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
+        """return the TranscriptInfo for supplied accession (tx_ac, alt_ac, alt_aln_method)
+
+        :raises HGVSDataNotAvailableError: if no such alignment exists
 
         :param tx_ac: transcript accession with version (e.g., 'NM_000051.3')
         :type tx_ac: str
@@ -407,7 +414,15 @@ class UTABase(Interface):
             msg = f"No tx_info for (tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             raise HGVSDataNotAvailableError(msg)
         if len(rows) == 1:
-            return rows[0]
+            row = rows[0]
+            return TranscriptInfo(
+                tx_ac=row["tx_ac"],
+                alt_ac=row["alt_ac"],
+                alt_aln_method=row["alt_aln_method"],
+                cds_start_i=row["cds_start_i"],
+                cds_end_i=row["cds_end_i"],
+                hgnc=row["hgnc"],
+            )
         msg = (
             f"Multiple ({len(rows)}) replies for tx_info(tx_ac="
             f"{tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"

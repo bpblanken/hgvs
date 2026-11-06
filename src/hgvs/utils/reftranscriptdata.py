@@ -2,8 +2,6 @@ import logging
 
 from bioutils.sequences import TranslationTable, translate_cds
 
-from hgvs.exceptions import HGVSDataNotAvailableError
-
 # Constants for mitochondrial transcript handling
 _REMAINDER_TWO = 2
 
@@ -15,10 +13,6 @@ class RefTranscriptData:
         """helper for generating RefTranscriptData from for c_to_p"""
         tx_info = hdp.get_tx_identity_info(tx_ac)
         tx_seq = hdp.get_seq(tx_ac)
-
-        if tx_info is None or tx_seq is None:
-            msg = f"Missing transcript data for accession: {tx_ac}"
-            raise HGVSDataNotAvailableError(msg)
 
         # use 1-based hgvs coords
         cds_start = tx_info["cds_start_i"] + 1

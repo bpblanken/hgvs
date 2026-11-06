@@ -229,8 +229,8 @@ class Normalizer:
 
             # Get tx info
             tx_info = self.hdp.get_tx_info(var.ac, alt_ac, self.alt_aln_method)
-            cds_start = tx_info["cds_start_i"]
-            cds_end = tx_info["cds_end_i"]
+            cds_start = tx_info.cds_start_i
+            cds_end = tx_info.cds_end_i
 
             # Get exon info
             exon_info = self.hdp.get_tx_exons(var.ac, alt_ac, self.alt_aln_method)
@@ -297,9 +297,6 @@ class Normalizer:
             return float("inf")
         # Get genomic sequence access number for this transcript
         identity_info = self.hdp.get_tx_identity_info(var.ac)
-        if not identity_info:
-            msg = f"No identity info available for {var.ac}"
-            raise HGVSDataNotAvailableError(msg)
         tgt_len = sum(identity_info["lengths"])
         return tgt_len
 

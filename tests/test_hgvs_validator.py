@@ -7,7 +7,7 @@ import hgvs.dataproviders.uta
 import hgvs.parsers
 import hgvs.validator
 import hgvs.variantmapper
-from hgvs.exceptions import HGVSInvalidVariantError
+from hgvs.exceptions import HGVSDataNotAvailableError, HGVSInvalidVariantError
 from support import CACHE
 
 hdp = hgvs.dataproviders.uta.connect(mode=os.environ.get("HGVS_CACHE_MODE", "run"), cache=CACHE)
@@ -236,6 +236,13 @@ class Test_HGVSExtrinsicValidator(unittest.TestCase):
         self.assertTrue(
             self.validate_ext.validate(self.hp.parse_hgvs_variant("NM_145901.2:c.-22C>T"))
         )
+
+    def test_unknown_transcript_raises_data_not_available(self):
+        """A transcript the data provider does not know surfaces as HGVSDataNotAvailableError."""
+        with self.assertRaises(HGVSDataNotAvailableError):
+            self.validate_ext.validate(self.hp.parse_hgvs_variant("NM_bogus.1:n.5C>T"))
+        with self.assertRaises(HGVSDataNotAvailableError):
+            self.validate_ext.validate(self.hp.parse_hgvs_variant("NM_bogus.1:c.5C>T"))
 
 
 if __name__ == "__main__":
