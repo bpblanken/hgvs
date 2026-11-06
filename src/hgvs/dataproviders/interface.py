@@ -3,7 +3,7 @@
 import abc
 import logging
 import os
-from typing import ClassVar, NoReturn
+from typing import ClassVar
 
 import hgvs
 
@@ -245,11 +245,6 @@ class _V4Bridge(Interface):
     def required_version(self):
         return self._provider.required_version
 
-    def _not_found(self, method, *args) -> NoReturn:
-        # version 4 allowed None for "not found"; version 5 raises
-        msg = f"{type(self._provider).__name__}.{method}{args!r} returned no data"
-        raise HGVSDataNotAvailableError(msg)
-
     # -- unchanged contract: delegated as-is -------------------------------
 
     def data_version(self):
@@ -275,7 +270,9 @@ class _V4Bridge(Interface):
     def get_gene_info(self, gene: str) -> GeneInfo:
         d = self._provider.get_gene_info(gene)
         if d is None:
-            self._not_found("get_gene_info", gene)
+            # version 4 allowed None for "not found"; version 5 raises
+            msg = f"{type(self._provider).__name__}.get_gene_info({gene!r}) returned no data"
+            raise HGVSDataNotAvailableError(msg)
         return GeneInfo(
             hgnc=d["hgnc"],
             symbol=d["symbol"],
@@ -306,7 +303,11 @@ class _V4Bridge(Interface):
     def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         ds = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
         if ds is None:
-            self._not_found("get_tx_exons", tx_ac, alt_ac, alt_aln_method)
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_exons"
+                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
         return [
             TranscriptExon(
                 tx_ac=d["tx_ac"],
@@ -325,7 +326,17 @@ class _V4Bridge(Interface):
         ]
 
     def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
-        return [self._tx_info(d) for d in self._provider.get_tx_for_gene(gene)]
+        return [
+            TranscriptInfo(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                cds_start_i=d["cds_start_i"],
+                cds_end_i=d["cds_end_i"],
+                hgnc=d["hgnc"],
+            )
+            for d in self._provider.get_tx_for_gene(gene)
+        ]
 
     def get_tx_for_region(
         self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
@@ -345,7 +356,10 @@ class _V4Bridge(Interface):
     def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         d = self._provider.get_tx_identity_info(tx_ac)
         if d is None:
-            self._not_found("get_tx_identity_info", tx_ac)
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_identity_info({tx_ac!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
         return TranscriptIdentityInfo(
             tx_ac=d["tx_ac"],
             alt_ac=d["alt_ac"],
@@ -359,19 +373,11 @@ class _V4Bridge(Interface):
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         d = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
         if d is None:
-            self._not_found("get_tx_info", tx_ac, alt_ac, alt_aln_method)
-        return self._tx_info(d)
-
-    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
-        return [
-            TranscriptMappingOption(
-                tx_ac=d["tx_ac"], alt_ac=d["alt_ac"], alt_aln_method=d["alt_aln_method"]
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_info"
+                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
             )
-            for d in self._provider.get_tx_mapping_options(tx_ac)
-        ]
-
-    @staticmethod
-    def _tx_info(d) -> TranscriptInfo:
+            raise HGVSDataNotAvailableError(msg)
         return TranscriptInfo(
             tx_ac=d["tx_ac"],
             alt_ac=d["alt_ac"],
@@ -380,6 +386,14 @@ class _V4Bridge(Interface):
             cds_end_i=d["cds_end_i"],
             hgnc=d["hgnc"],
         )
+
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
+        return [
+            TranscriptMappingOption(
+                tx_ac=d["tx_ac"], alt_ac=d["alt_ac"], alt_aln_method=d["alt_aln_method"]
+            )
+            for d in self._provider.get_tx_mapping_options(tx_ac)
+        ]
 
 
 # <LICENSE>

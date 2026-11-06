@@ -220,17 +220,6 @@ class UTABase(Interface):
     ############################################################################
     # Queries
 
-    @staticmethod
-    def _tx_info_from_row(row) -> TranscriptInfo:
-        return TranscriptInfo(
-            tx_ac=row["tx_ac"],
-            alt_ac=row["alt_ac"],
-            alt_aln_method=row["alt_aln_method"],
-            cds_start_i=row["cds_start_i"],
-            cds_end_i=row["cds_end_i"],
-            hgnc=row["hgnc"],
-        )
-
     def data_version(self):
         return self.url.schema
 
@@ -379,7 +368,17 @@ class UTABase(Interface):
         :type gene: str
         """
         rows = self._fetchall(self._queries["tx_for_gene"], [gene])
-        return [self._tx_info_from_row(r) for r in rows]
+        return [
+            TranscriptInfo(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                cds_start_i=r["cds_start_i"],
+                cds_end_i=r["cds_end_i"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
     def get_tx_for_region(
         self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
@@ -489,7 +488,15 @@ class UTABase(Interface):
             msg = f"No tx_info for (tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             raise HGVSDataNotAvailableError(msg)
         if len(rows) == 1:
-            return self._tx_info_from_row(rows[0])
+            row = rows[0]
+            return TranscriptInfo(
+                tx_ac=row["tx_ac"],
+                alt_ac=row["alt_ac"],
+                alt_aln_method=row["alt_aln_method"],
+                cds_start_i=row["cds_start_i"],
+                cds_end_i=row["cds_end_i"],
+                hgnc=row["hgnc"],
+            )
         msg = (
             f"Multiple ({len(rows)}) replies for tx_info(tx_ac="
             f"{tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
