@@ -1,10 +1,8 @@
 """Defines the abstract data provider interface"""
 
 import abc
-import functools
 import logging
 import os
-import warnings
 from typing import ClassVar
 
 import hgvs
@@ -15,59 +13,6 @@ from ..utils.PersistentDict import PersistentDict
 from .models import TranscriptInfo
 
 _logger = logging.getLogger(__name__)
-
-
-def _to_model(model):
-    """Return a converter for values read from a persistent cache.
-
-    Dict results recorded before data models existed become ``model`` as they
-    leave the cache; models pass through untouched.
-    """
-
-    def convert(value):
-        return value if isinstance(value, model) else model(**value)
-
-    return convert
-
-
-def _coerce_to_model(method, model):
-    """Wrap a provider method so that a legacy dict result becomes ``model``.
-
-    Before data models existed, providers returned plain dicts keyed by
-    the UTA column names, and some returned ``None`` for "not found".
-    Providers that still do so keep working for now: dicts are converted
-    with a :class:`DeprecationWarning`, and ``None`` raises
-    :class:`HGVSDataNotAvailableError` as the mappers used to.  This
-    adapter will be removed in a future release.
-    """
-
-    @functools.wraps(method)
-    def wrapper(*args, **kwargs):
-        result = method(*args, **kwargs)
-        if isinstance(result, model):
-            return result
-        provider = type(method.__self__).__name__
-        if result is None:
-            msg = f"{provider}.{method.__name__}{args} returned no data"
-            raise HGVSDataNotAvailableError(msg)
-        if isinstance(result, dict):
-            warnings.warn(
-                f"{provider}.{method.__name__} returned a dict; data providers must return"
-                f" hgvs.dataproviders.models.{model.__name__}. Dict results are deprecated"
-                " and support will be removed in a future release.",
-                DeprecationWarning,
-                # attribute the warning to the caller of hdp.<method>(), skipping
-                # this wrapper and the lru_cache wrapper around it
-                stacklevel=3,
-            )
-            return model(**result)
-        msg = (
-            f"{provider}.{method.__name__} returned {type(result).__name__};"
-            f" expected hgvs.dataproviders.models.{model.__name__}"
-        )
-        raise TypeError(msg)
-
-    return wrapper
 
 
 class Interface(metaclass=abc.ABCMeta):
@@ -95,6 +40,22 @@ class Interface(metaclass=abc.ABCMeta):
 
     def interface_version(self):
         return 5
+
+    @classmethod
+    def from_v4(cls, provider):
+        """Bridge a data provider written against interface version 4.
+
+        Version 4 providers return plain dicts keyed by the UTA column
+        names.  The bridge presents such a provider through this
+        interface: methods whose contract is unchanged are delegated
+        as-is, and methods that now return models convert the dict.
+
+        >>> hdp = Interface.from_v4(legacy_provider)  # doctest: +SKIP
+
+        Caching, schema checking and any extra attributes (``url``,
+        ``seqfetcher``, ...) remain those of the wrapped provider.
+        """
+        return _V4Bridge(provider)
 
     def __init__(self, mode=None, cache=None):
         """
@@ -154,9 +115,9 @@ class Interface(metaclass=abc.ABCMeta):
         self.get_tx_identity_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_identity_info
         )
-        self.get_tx_info = lru_cache(
-            maxsize=maxsize, mode=self.mode, cache=self.cache, normalize=_to_model(TranscriptInfo)
-        )(_coerce_to_model(self.get_tx_info, TranscriptInfo))
+        self.get_tx_info = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
+            self.get_tx_info
+        )
         self.get_tx_mapping_options = lru_cache(maxsize=maxsize, mode=self.mode, cache=self.cache)(
             self.get_tx_mapping_options
         )
@@ -239,6 +200,82 @@ class Interface(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def get_tx_mapping_options(self, tx_ac):
         pass
+
+
+class _V4Bridge(Interface):
+    """Presents an interface version 4 data provider as version 5.
+
+    See :meth:`Interface.from_v4`.
+    """
+
+    def __init__(self, provider):
+        # Interface.__init__ is deliberately not called: the wrapped
+        # provider already caches its methods and has checked its schema
+        # version, and the bridge is a thin translation layer over it.
+        self._provider = provider
+
+    def __getattr__(self, name):
+        # attributes the interface does not define (url, seqfetcher, mode,
+        # ...) are the wrapped provider's
+        return getattr(self._provider, name)
+
+    @property
+    def required_version(self):
+        return self._provider.required_version
+
+    # -- unchanged contract: delegated as-is -------------------------------
+
+    def data_version(self):
+        return self._provider.data_version()
+
+    def schema_version(self):
+        return self._provider.schema_version()
+
+    def get_acs_for_protein_seq(self, seq):
+        return self._provider.get_acs_for_protein_seq(seq)
+
+    def get_assembly_map(self, assembly_name):
+        return self._provider.get_assembly_map(assembly_name)
+
+    def get_gene_info(self, gene):
+        return self._provider.get_gene_info(gene)
+
+    def get_pro_ac_for_tx_ac(self, tx_ac):
+        return self._provider.get_pro_ac_for_tx_ac(tx_ac)
+
+    def get_seq(self, ac, start_i=None, end_i=None):
+        return self._provider.get_seq(ac, start_i, end_i)
+
+    def get_similar_transcripts(self, tx_ac):
+        return self._provider.get_similar_transcripts(tx_ac)
+
+    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+        return self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
+
+    def get_tx_for_gene(self, gene):
+        return self._provider.get_tx_for_gene(gene)
+
+    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
+        return self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
+
+    def get_tx_identity_info(self, tx_ac):
+        return self._provider.get_tx_identity_info(tx_ac)
+
+    def get_tx_mapping_options(self, tx_ac):
+        return self._provider.get_tx_mapping_options(tx_ac)
+
+    # -- changed contract: dict results become models ------------------------
+
+    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
+        result = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
+        if result is None:
+            # some version 4 providers signalled "not found" with None
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_info"
+                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
+        return TranscriptInfo(**result)
 
 
 # <LICENSE>

@@ -1,12 +1,9 @@
-"""Tests for the abstract data provider interface"""
-
-import pickle
+"""Tests for the abstract data provider interface and the version 4 bridge"""
 
 import pytest
 
 from hgvs.dataproviders.interface import Interface
 from hgvs.dataproviders.models import TranscriptInfo
-from hgvs.decorators.lru_cache import _make_key
 from hgvs.exceptions import HGVSDataNotAvailableError
 
 TX_INFO_DICT = {
@@ -18,20 +15,22 @@ TX_INFO_DICT = {
     "alt_aln_method": "splign",
 }
 TX_INFO = TranscriptInfo(**TX_INFO_DICT)
+TX_INFO_ARGS = ("NM_000051.3", "AC_000143.1", "splign")
 
 
-class FakeProvider(Interface):
-    """Minimal provider whose get_tx_info returns whatever it is told to."""
+class V4Provider(Interface):
+    """A provider written against interface version 4: get_tx_info returns a dict."""
 
     required_version = "1.1"
+    url = "fake://v4"
 
-    def __init__(self, tx_info_result, mode=None, cache=None):
+    def __init__(self, tx_info_result):
         self._tx_info_result = tx_info_result
-        self.calls = 0
-        super().__init__(mode=mode, cache=cache)
+        self.calls = []
+        super().__init__()
 
-    def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):  # noqa: ARG002
-        self.calls += 1
+    def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):
+        self.calls.append(("get_tx_info", tx_ac, alt_ac, alt_aln_method))
         return self._tx_info_result
 
     def data_version(self):
@@ -39,6 +38,10 @@ class FakeProvider(Interface):
 
     def schema_version(self):
         return "1.1"
+
+    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+        self.calls.append(("get_tx_exons", tx_ac, alt_ac, alt_aln_method))
+        return [{"tx_ac": tx_ac, "alt_ac": alt_ac, "alt_aln_method": alt_aln_method}]
 
     # the remaining abstract methods are not exercised here
     def get_acs_for_protein_seq(self, seq):
@@ -59,9 +62,6 @@ class FakeProvider(Interface):
     def get_similar_transcripts(self, tx_ac):
         raise NotImplementedError
 
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
-        raise NotImplementedError
-
     def get_tx_for_gene(self, gene):
         raise NotImplementedError
 
@@ -75,74 +75,45 @@ class FakeProvider(Interface):
         raise NotImplementedError
 
 
-def test_model_result_passes_through_without_warning(recwarn):
-    hdp = FakeProvider(TX_INFO)
-    assert hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign") is TX_INFO
-    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+def test_bridge_is_a_version_5_interface():
+    hdp = Interface.from_v4(V4Provider(dict(TX_INFO_DICT)))
+    assert isinstance(hdp, Interface)
+    assert hdp.interface_version() == 5
 
 
-def test_legacy_dict_result_is_coerced_with_warning():
-    hdp = FakeProvider(dict(TX_INFO_DICT))
-    with pytest.warns(DeprecationWarning, match="FakeProvider.get_tx_info returned a dict"):
-        result = hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
-    assert result == TX_INFO
+def test_bridge_converts_dict_tx_info_to_model():
+    provider = V4Provider(dict(TX_INFO_DICT))
+    hdp = Interface.from_v4(provider)
+    assert hdp.get_tx_info(*TX_INFO_ARGS) == TX_INFO
+    assert provider.calls == [("get_tx_info", *TX_INFO_ARGS)]
 
 
-def test_legacy_none_result_raises_data_not_available():
-    hdp = FakeProvider(None)
-    with pytest.raises(HGVSDataNotAvailableError, match="returned no data"):
-        hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
+def test_bridge_turns_none_tx_info_into_data_not_available():
+    hdp = Interface.from_v4(V4Provider(None))
+    with pytest.raises(
+        HGVSDataNotAvailableError, match=r"V4Provider\.get_tx_info.*returned no data"
+    ):
+        hdp.get_tx_info(*TX_INFO_ARGS)
 
 
-def test_unexpected_result_type_raises_type_error():
-    hdp = FakeProvider(("NM_000051.3", 385, 9556))
-    with pytest.raises(TypeError, match=r"expected hgvs\.dataproviders\.models\.TranscriptInfo"):
-        hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
-
-
-def test_coerced_result_is_cached_as_model():
-    hdp = FakeProvider(dict(TX_INFO_DICT))
-    with pytest.warns(DeprecationWarning, match="returned a dict"):
-        first = hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
-    second = hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
-    assert second is first
-    assert hdp.calls == 1
-    assert hdp.get_tx_info.cache_info().hits == 1
-
-
-def _write_legacy_cache(path, tx_info_value):
-    """Write a persistent cache as a pre-2.0 hgvs would have: dict results."""
-    entries = {
-        _make_key("schema_version", (), {}, False, ()): "1.1",
-        _make_key(
-            "get_tx_info", ("NM_000051.3", "AC_000143.1", "splign"), {}, False, ()
-        ): tx_info_value,
-    }
-    with path.open("wb") as f:
-        pickle.dump(entries, f, 4)
-
-
-def test_legacy_cache_dict_is_converted_as_it_leaves_the_cache(tmp_path, recwarn):
-    cache = tmp_path / "cache.hdp"
-    _write_legacy_cache(cache, dict(TX_INFO_DICT))
-    hdp = FakeProvider(None, mode="run", cache=str(cache))
-    result = hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
-    assert result == TX_INFO
-    assert hdp.calls == 0, "run mode must be served from the cache"
-    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
-
-
-def test_legacy_cache_dict_verifies_against_a_model_result(tmp_path):
-    cache = tmp_path / "cache.hdp"
-    _write_legacy_cache(cache, dict(TX_INFO_DICT))
-    hdp = FakeProvider(TX_INFO, mode="verify", cache=str(cache))
-    assert hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign") == TX_INFO
-    assert hdp.calls == 1, "verify mode must call the provider"
-
-
-def test_legacy_cache_dict_with_unknown_keys_fails_on_read(tmp_path):
-    cache = tmp_path / "cache.hdp"
-    _write_legacy_cache(cache, {**TX_INFO_DICT, "bogus": 1})
-    hdp = FakeProvider(None, mode="run", cache=str(cache))
+def test_bridge_rejects_dict_with_unknown_keys():
+    hdp = Interface.from_v4(V4Provider({**TX_INFO_DICT, "bogus": 1}))
     with pytest.raises(TypeError, match="bogus"):
-        hdp.get_tx_info("NM_000051.3", "AC_000143.1", "splign")
+        hdp.get_tx_info(*TX_INFO_ARGS)
+
+
+def test_bridge_delegates_unchanged_methods_as_is():
+    provider = V4Provider(dict(TX_INFO_DICT))
+    hdp = Interface.from_v4(provider)
+    assert hdp.get_tx_exons(*TX_INFO_ARGS) == provider.get_tx_exons(*TX_INFO_ARGS)
+    assert hdp.schema_version() == "1.1"
+    assert hdp.data_version() == "fake"
+
+
+def test_bridge_exposes_provider_attributes():
+    provider = V4Provider(dict(TX_INFO_DICT))
+    hdp = Interface.from_v4(provider)
+    assert hdp.url == "fake://v4"
+    assert hdp.required_version == "1.1"
+    with pytest.raises(AttributeError):
+        _ = hdp.no_such_attribute

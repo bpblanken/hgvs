@@ -10,44 +10,11 @@ marks an interbase coordinate.
 
 """
 
-import warnings
 from dataclasses import dataclass
-from typing import Any
-
-
-class _DeprecatedItemAccess:
-    """Transitional dict-style access for models that replaced dict results.
-
-    Data providers returned plain dicts before these models existed.
-    ``model["field"]`` and ``model.get("field")`` still work, but emit a
-    :class:`DeprecationWarning`; use attribute access instead.  This shim
-    will be removed in a future release.
-    """
-
-    __slots__ = ()
-
-    def __getitem__(self, key: str) -> Any:
-        warnings.warn(
-            f"{type(self).__name__}[{key!r}] is deprecated; use .{key} instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        try:
-            return getattr(self, key)
-        except AttributeError:
-            raise KeyError(key) from None
-
-    def get(self, key: str, default: Any = None) -> Any:
-        warnings.warn(
-            f"{type(self).__name__}.get({key!r}) is deprecated; use .{key} instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return getattr(self, key, default)
 
 
 @dataclass(frozen=True, slots=True)
-class TranscriptInfo(_DeprecatedItemAccess):
+class TranscriptInfo:
     """A transcript as aligned to a reference sequence, with its CDS bounds.
 
     :param tx_ac: transcript accession with version (e.g., ``NM_000051.3``)

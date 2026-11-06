@@ -28,18 +28,6 @@ def test_transcript_info_round_trips_through_pickle(tx_info):
     assert pickle.loads(pickle.dumps(tx_info)) == tx_info  # noqa: S301 - trusted, built above
 
 
-def test_deprecated_getitem_returns_field_and_warns(tx_info):
-    with pytest.warns(DeprecationWarning, match=r"TranscriptInfo\['cds_start_i'\] is deprecated"):
-        assert tx_info["cds_start_i"] == 385
-
-
-def test_deprecated_getitem_unknown_key_raises_keyerror(tx_info):
-    with pytest.warns(DeprecationWarning, match="no_such_field"), pytest.raises(KeyError):
-        tx_info["no_such_field"]
-
-
-def test_deprecated_get_returns_field_or_default(tx_info):
-    with pytest.warns(DeprecationWarning, match=r"TranscriptInfo\.get\('hgnc'\) is deprecated"):
-        assert tx_info.get("hgnc") == "ATM"
-    with pytest.warns(DeprecationWarning, match="no_such_field"):
-        assert tx_info.get("no_such_field", "dflt") == "dflt"
+def test_transcript_info_has_no_dict_access(tx_info):
+    with pytest.raises(TypeError):
+        tx_info["cds_start_i"]

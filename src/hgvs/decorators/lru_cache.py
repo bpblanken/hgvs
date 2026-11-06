@@ -73,7 +73,7 @@ RUN = 2
 VERIFY = 3
 
 
-def lru_cache(maxsize=100, typed=False, mode=None, cache=None, normalize=None):
+def lru_cache(maxsize=100, typed=False, mode=None, cache=None):
     """Least-recently-used cache decorator.
 
     If *maxsize* is set to None, the LRU features are disabled and the cache
@@ -99,9 +99,6 @@ def lru_cache(maxsize=100, typed=False, mode=None, cache=None, normalize=None):
         RUN:    queries are executed against caches; misses result in DataNotLocallyAvailableError
         VERIFY: always execute the function; if persistent cache value and returned value are different, raise VerifyFailedError
     :param cache: PersistentDict object or None;
-    :param normalize: optional callable applied to values read back from a
-        persistent cache, e.g. to convert results recorded by an earlier
-        release to the type the function returns today.
 
     """
 
@@ -147,8 +144,6 @@ def lru_cache(maxsize=100, typed=False, mode=None, cache=None, normalize=None):
                 key = make_key(user_function.__name__, args, kwds, typed, ())
                 result = cache_get(key, root)  # root used here as a unique not-found sentinel
                 if result is not root:
-                    if normalize is not None:
-                        result = normalize(result)
                     stats[HITS] += 1
                     if mode == VERIFY:
                         latestres = user_function(*args, **kwds)
