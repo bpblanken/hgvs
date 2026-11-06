@@ -160,7 +160,7 @@ class Interface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
-        pass
+        """Raises HGVSDataNotAvailableError if the alignment is not found."""
 
     @abc.abstractmethod
     def get_tx_for_gene(self, gene):
@@ -172,11 +172,11 @@ class Interface(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_tx_identity_info(self, tx_ac):
-        pass
+        """Raises HGVSDataNotAvailableError if the transcript is not found."""
 
     @abc.abstractmethod
     def get_tx_info(self, tx_ac, alt_ac, alt_aln_method):
-        pass
+        """Raises HGVSDataNotAvailableError if the alignment is not found."""
 
     @abc.abstractmethod
     def get_tx_mapping_options(self, tx_ac):

@@ -16,7 +16,7 @@ class RefTranscriptData:
         tx_info = hdp.get_tx_identity_info(tx_ac)
         tx_seq = hdp.get_seq(tx_ac)
 
-        if tx_info is None or tx_seq is None:
+        if tx_seq is None:
             msg = f"Missing transcript data for accession: {tx_ac}"
             raise HGVSDataNotAvailableError(msg)
 
