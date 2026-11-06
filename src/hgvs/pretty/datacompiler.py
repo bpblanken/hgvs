@@ -147,21 +147,21 @@ class DataCompiler:
         i = -1
         for ex in tx_exons:
             i += 1
-            exon_nr = ex["ord"] + 1
+            exon_nr = ex.ord + 1
 
-            if ex["alt_start_i"] < genomic_pos and ex["alt_end_i"] >= genomic_pos:
+            if ex.alt_start_i < genomic_pos and ex.alt_end_i >= genomic_pos:
                 return (exon_nr, "exon")
 
             if i > 0:
-                if ex["alt_strand"] > 0:
+                if ex.alt_strand > 0:
                     if (
-                        tx_exons[i - 1]["alt_end_i"] < genomic_pos
-                        and tx_exons[i]["alt_start_i"] >= genomic_pos
+                        tx_exons[i - 1].alt_end_i < genomic_pos
+                        and tx_exons[i].alt_start_i >= genomic_pos
                     ):
                         return (exon_nr, "intron")
                 elif (
-                    tx_exons[i]["alt_start_i"] < genomic_pos
-                    and tx_exons[i - 1]["alt_end_i"] >= genomic_pos
+                    tx_exons[i].alt_start_i < genomic_pos
+                    and tx_exons[i - 1].alt_end_i >= genomic_pos
                 ):
                     return (i, "intron")
 
@@ -251,7 +251,7 @@ class DataCompiler:
 
         if tx_ac:
             tx_exons = self.config.hdp.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
-            tx_exons = sorted(tx_exons, key=lambda e: e["ord"])
+            tx_exons = sorted(tx_exons, key=lambda e: e.ord)
         else:
             tx_exons = []
 

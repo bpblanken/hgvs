@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import csv
 
+from hgvs.dataproviders.models import TranscriptIdentityInfo
+
 # Mock test input source
 
 
@@ -31,7 +33,15 @@ class MockInputSource:
         result = None
         data = self._mock_data.get(ac)
         if data:  # interbase coordinates
-            result = {"cds_start_i": data["cds_start_i"], "cds_end_i": data["cds_end_i"], "lengths": data["lengths"]}
+            result = TranscriptIdentityInfo(
+                tx_ac=ac,
+                alt_ac=ac,
+                alt_aln_method="transcript",
+                cds_start_i=data["cds_start_i"],
+                cds_end_i=data["cds_end_i"],
+                lengths=data["lengths"],
+                hgnc=None,
+            )
         return result
 
     def get_tx_identity_info(self, ac):
@@ -54,7 +64,7 @@ class MockInputSource:
         return self.get_tx_seq(ac)[start_i:end_i]
 
     def get_pro_ac_for_tx_ac(self, ac):
-        return 'MOCK'
+        return "MOCK"
 
     #
     # internal methods
@@ -79,6 +89,7 @@ class MockInputSource:
                 }
 
         return result
+
 
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)

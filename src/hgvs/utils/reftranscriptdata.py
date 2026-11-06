@@ -15,8 +15,8 @@ class RefTranscriptData:
         tx_seq = hdp.get_seq(tx_ac)
 
         # use 1-based hgvs coords
-        cds_start = tx_info["cds_start_i"] + 1
-        cds_stop = tx_info["cds_end_i"]
+        cds_start = tx_info.cds_start_i + 1
+        cds_stop = tx_info.cds_end_i
 
         tx_seq_to_translate = tx_seq[cds_start - 1 : cds_stop]
         # add poly(A) tail to mitochondrial transcripts to complete partial stop codons
@@ -55,9 +55,9 @@ class RefTranscriptData:
             # This is expected for some accessions that may not be available
             _logger.debug("Could not fetch reference protein sequence for %s: %s", pro_ac, e)
 
-        exon_start_positions = [-tx_info["cds_start_i"]]
-        exon_end_positions = [exon_start_positions[0] + tx_info["lengths"][0]]
-        for exon_length in tx_info["lengths"][1:]:
+        exon_start_positions = [-tx_info.cds_start_i]
+        exon_end_positions = [exon_start_positions[0] + tx_info.lengths[0]]
+        for exon_length in tx_info.lengths[1:]:
             exon_start_positions.append(exon_end_positions[-1] + 1)
             exon_end_positions.append(exon_end_positions[-1] + exon_length)
 

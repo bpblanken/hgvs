@@ -23,7 +23,15 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
-from .models import TranscriptInfo
+from .models import (
+    GeneInfo,
+    SimilarTranscript,
+    TranscriptAlignment,
+    TranscriptExon,
+    TranscriptIdentityInfo,
+    TranscriptInfo,
+    TranscriptMappingOption,
+)
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -243,9 +251,11 @@ class UTABase(Interface):
             "MD5_" + md5
         ]
 
-    def get_gene_info(self, gene):
+    def get_gene_info(self, gene: str) -> GeneInfo:
         """
         returns basic information about the gene.
+
+        :raises HGVSDataNotAvailableError: if no such gene exists
 
         :param gene: HGNC gene name
         :type gene: str
@@ -259,9 +269,24 @@ class UTABase(Interface):
         added   | 2014-02-04 21:39:32.57125
 
         """
-        return self._fetchone(self._queries["gene_info"], [gene])
+        row = self._fetchone(self._queries["gene_info"], [gene])
+        if row is None:
+            msg = f"No gene_info for (gene={gene})"
+            raise HGVSDataNotAvailableError(msg)
+        return GeneInfo(
+            hgnc=row["hgnc"],
+            symbol=row["symbol"],
+            gene_id=row["gene_id"],
+            maploc=row["maploc"],
+            descr=row["descr"],
+            summary=row["summary"],
+            aliases=row["aliases"],
+            type=row["type"],
+            xrefs=row["xrefs"],
+            added=row["added"],
+        )
 
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         """
         return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method)
 
@@ -318,18 +343,46 @@ class UTABase(Interface):
                 f"(tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             )
             raise HGVSDataNotAvailableError(msg)
-        return rows
+        return [
+            TranscriptExon(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                alt_strand=r["alt_strand"],
+                ord=r["ord"],
+                tx_start_i=r["tx_start_i"],
+                tx_end_i=r["tx_end_i"],
+                alt_start_i=r["alt_start_i"],
+                alt_end_i=r["alt_end_i"],
+                cigar=r["cigar"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
-    def get_tx_for_gene(self, gene):
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
         """
         return transcript info records for supplied gene, in order of decreasing length
 
         :param gene: HGNC gene name
         :type gene: str
         """
-        return self._fetchall(self._queries["tx_for_gene"], [gene])
+        rows = self._fetchall(self._queries["tx_for_gene"], [gene])
+        return [
+            TranscriptInfo(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                cds_start_i=r["cds_start_i"],
+                cds_end_i=r["cds_end_i"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
         """
         return transcripts that overlap given region
 
@@ -343,7 +396,9 @@ class UTABase(Interface):
             alt_ac=alt_ac, start_i=start_i, end_i=end_i, alt_aln_method=alt_aln_method
         )
 
-    def get_alignments_for_region(self, alt_ac, start_i, end_i, alt_aln_method=None):
+    def get_alignments_for_region(
+        self, alt_ac: str, start_i: int, end_i: int, alt_aln_method: str | None = None
+    ) -> list[TranscriptAlignment]:
         """
         return transcripts that overlap given region
 
@@ -358,9 +413,19 @@ class UTABase(Interface):
         )
         if alt_aln_method is not None:
             alignments = [a for a in alignments if a["alt_aln_method"] == alt_aln_method]
-        return alignments
+        return [
+            TranscriptAlignment(
+                tx_ac=a["tx_ac"],
+                alt_ac=a["alt_ac"],
+                alt_aln_method=a["alt_aln_method"],
+                alt_strand=a["alt_strand"],
+                start_i=a["start_i"],
+                end_i=a["end_i"],
+            )
+            for a in alignments
+        ]
 
-    def get_tx_identity_info(self, tx_ac):
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         """returns features associated with a single transcript.
 
         :raises HGVSDataNotAvailableError: if no such transcript exists
@@ -383,7 +448,16 @@ class UTABase(Interface):
         if len(rows) == 0:
             msg = f"No transcript definition for (tx_ac={tx_ac})"
             raise HGVSDataNotAvailableError(msg)
-        return rows[0]
+        row = rows[0]
+        return TranscriptIdentityInfo(
+            tx_ac=row["tx_ac"],
+            alt_ac=row["alt_ac"],
+            alt_aln_method=row["alt_aln_method"],
+            cds_start_i=row["cds_start_i"],
+            cds_end_i=row["cds_end_i"],
+            lengths=tuple(row["lengths"]),
+            hgnc=row["hgnc"],
+        )
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         """return the TranscriptInfo for supplied accession (tx_ac, alt_ac, alt_aln_method)
@@ -429,7 +503,7 @@ class UTABase(Interface):
         )
         raise HGVSError(msg)
 
-    def get_tx_mapping_options(self, tx_ac):
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
         """Return all transcript alignment sets for a given transcript
         accession (tx_ac); returns empty list if transcript does not
         exist.  Use this method to discovery possible mapping options
@@ -456,19 +530,22 @@ class UTABase(Interface):
 
         """
         rows = self._fetchall(self._queries["tx_mapping_options"], [tx_ac])
-        return rows
+        return [
+            TranscriptMappingOption(
+                tx_ac=r["tx_ac"], alt_ac=r["alt_ac"], alt_aln_method=r["alt_aln_method"]
+            )
+            for r in rows
+        ]
 
-    def get_similar_transcripts(self, tx_ac):
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
         """Return a list of transcripts that are similar to the given
         transcript, with relevant similarity criteria.
 
         >> sim_tx = hdp.get_similar_transcripts('NM_001285829.1')
-        >> dict(sim_tx[0])
-        { 'cds_eq': False,
-        'cds_es_fp_eq': False,
-        'es_fp_eq': True,
-        'tx_ac1': 'NM_001285829.1',
-        'tx_ac2': 'ENST00000498907' }
+        >> sim_tx[0]
+        SimilarTranscript(tx_ac1='NM_001285829.1', tx_ac2='ENST00000341255',
+                          hgnc_eq=False, cds_eq=False, es_fp_eq=False,
+                          cds_es_fp_eq=False, cds_exon_lengths_fp_eq=True)
 
         where:
 
@@ -488,7 +565,18 @@ class UTABase(Interface):
         """
 
         rows = self._fetchall(self._queries["tx_similar"], [tx_ac])
-        return rows
+        return [
+            SimilarTranscript(
+                tx_ac1=r["tx_ac1"],
+                tx_ac2=r["tx_ac2"],
+                hgnc_eq=r["hgnc_eq"],
+                cds_eq=r["cds_eq"],
+                es_fp_eq=r["es_fp_eq"],
+                cds_es_fp_eq=r["cds_es_fp_eq"],
+                cds_exon_lengths_fp_eq=r["cds_exon_lengths_fp_eq"],
+            )
+            for r in rows
+        ]
 
     def get_pro_ac_for_tx_ac(self, tx_ac):
         """Return the (single) associated protein accession for a given transcript

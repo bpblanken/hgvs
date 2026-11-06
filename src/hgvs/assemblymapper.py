@@ -186,7 +186,7 @@ class AssemblyMapper(VariantMapper):
             s.base,
             e.base,
         )
-        return [e["tx_ac"] for e in tx]
+        return [e.tx_ac for e in tx]
 
     def _alt_ac_for_tx_ac(self, tx_ac):
         """return chromosomal accession for given transcript accession (and
@@ -195,10 +195,9 @@ class AssemblyMapper(VariantMapper):
 
         """
         alt_acs = [
-            e["alt_ac"]
+            e.alt_ac
             for e in self.hdp.get_tx_mapping_options(tx_ac)
-            if e["alt_aln_method"] == self.alt_aln_method
-            and e["alt_ac"] in self._assembly_accessions
+            if e.alt_aln_method == self.alt_aln_method and e.alt_ac in self._assembly_accessions
         ]
 
         if not alt_acs:

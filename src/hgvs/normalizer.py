@@ -224,8 +224,8 @@ class Normalizer:
             if not map_info:
                 msg = f"No mapping info available for {var.ac}"
                 raise HGVSDataNotAvailableError(msg)
-            map_info = [item for item in map_info if item["alt_aln_method"] == self.alt_aln_method]
-            alt_ac = map_info[0]["alt_ac"]
+            map_info = [item for item in map_info if item.alt_aln_method == self.alt_aln_method]
+            alt_ac = map_info[0].alt_ac
 
             # Get tx info
             tx_info = self.hdp.get_tx_info(var.ac, alt_ac, self.alt_aln_method)
@@ -234,8 +234,8 @@ class Normalizer:
 
             # Get exon info
             exon_info = self.hdp.get_tx_exons(var.ac, alt_ac, self.alt_aln_method)
-            exon_starts = [exon["tx_start_i"] for exon in exon_info]
-            exon_ends = [exon["tx_end_i"] for exon in exon_info]
+            exon_starts = [exon.tx_start_i for exon in exon_info]
+            exon_ends = [exon.tx_end_i for exon in exon_info]
             exon_starts.sort()
             exon_ends.sort()
             exon_starts.append(exon_ends[-1])
@@ -297,7 +297,7 @@ class Normalizer:
             return float("inf")
         # Get genomic sequence access number for this transcript
         identity_info = self.hdp.get_tx_identity_info(var.ac)
-        tgt_len = sum(identity_info["lengths"])
+        tgt_len = sum(identity_info.lengths)
         return tgt_len
 
     def _fetch_bounded_seq(self, var, start, end, window_size, boundary):
