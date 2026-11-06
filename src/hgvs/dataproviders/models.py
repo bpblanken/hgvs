@@ -94,7 +94,12 @@ class TranscriptExon:
 
 @dataclass(frozen=True, slots=True)
 class TranscriptMappingOption:
-    """A reference sequence and method a transcript has an alignment for."""
+    """A reference sequence and method a transcript has an alignment for.
+
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference sequence accession the transcript is aligned to
+    :param alt_aln_method: alignment method (e.g., ``splign``, ``blat``)
+    """
 
     tx_ac: str
     alt_ac: str
@@ -105,8 +110,12 @@ class TranscriptMappingOption:
 class TranscriptAlignment:
     """The span a transcript's alignment covers on a reference sequence.
 
-    :param start_i: alignment start on the reference (interbase)
-    :param end_i: alignment end on the reference (interbase)
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference sequence accession the transcript is aligned to
+    :param alt_aln_method: alignment method (e.g., ``splign``, ``blat``)
+    :param alt_strand: strand of the alignment on the reference, ``1`` or ``-1``
+    :param start_i: alignment start on the reference
+    :param end_i: alignment end on the reference
     """
 
     tx_ac: str
@@ -123,6 +132,8 @@ class SimilarTranscript:
 
     ``es`` is exon structure, ``fp`` fingerprint, ``eq`` equal.
 
+    :param tx_ac1: the transcript the comparison was made for
+    :param tx_ac2: the transcript it is compared to
     :param hgnc_eq: same gene symbol
     :param cds_eq: identical CDS sequences
     :param es_fp_eq: identical exon structures, UTRs included
