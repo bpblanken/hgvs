@@ -31,6 +31,13 @@ class Interface(metaclass=abc.ABCMeta):
     data provider implementation should be a subclass (possibly
     indirect) of this class.
 
+    Methods that look up a single sequence, transcript or alignment
+    (``get_seq``, ``get_tx_info``, ``get_tx_exons``,
+    ``get_tx_identity_info``) raise
+    :class:`hgvs.exceptions.HGVSDataNotAvailableError` when nothing is
+    found; they never return ``None``.  Callers rely on this and do not
+    check the result.
+
     .. _`Universal Transcript Archive (UTA)`: https://github.com/biocommons/uta
     .. _Invitae: http://invitae.com/
     """

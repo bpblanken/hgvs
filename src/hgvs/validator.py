@@ -177,11 +177,6 @@ class ExtrinsicValidator:
         if var.type != "c":
             return (ValidationLevel.VALID, None)
         tx_info = self.hdp.get_tx_identity_info(var.ac)
-        if tx_info is None:
-            return (
-                ValidationLevel.WARNING,
-                f"No transcript data for accession: {var.ac}",
-            )
         cds_length = tx_info["cds_end_i"] - tx_info["cds_start_i"]
 
         s, e = get_start_end(var)
@@ -203,11 +198,6 @@ class ExtrinsicValidator:
             return (ValidationLevel.VALID, None)
         tx_info = self.hdp.get_tx_identity_info(var.ac)
         tx_len = sum(tx_info["lengths"])
-        if tx_info is None:
-            return (
-                ValidationLevel.WARNING,
-                f"No transcript data for accession: {var.ac}",
-            )
 
         s, e = get_start_end(var)
 
