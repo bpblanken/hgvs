@@ -3,7 +3,7 @@
 import abc
 import logging
 import os
-from typing import ClassVar
+from typing import ClassVar, NoReturn
 
 import hgvs
 
@@ -18,7 +18,6 @@ from .models import (
     TranscriptIdentityInfo,
     TranscriptInfo,
     TranscriptMappingOption,
-    from_mapping,
 )
 
 _logger = logging.getLogger(__name__)
@@ -68,8 +67,8 @@ class Interface(metaclass=abc.ABCMeta):
         Version 4 providers return plain dicts keyed by the UTA column
         names.  The bridge presents such a provider through this
         interface: methods whose contract is unchanged are delegated
-        as-is, and methods that now return models convert the dicts.
-        Keys the models do not declare are ignored.
+        as-is, and methods that now return models build them from the
+        dicts' UTA-named keys.
 
         >>> hdp = Interface.from_v4(legacy_provider)  # doctest: +SKIP
 
@@ -246,18 +245,10 @@ class _V4Bridge(Interface):
     def required_version(self):
         return self._provider.required_version
 
-    def _single(self, method, model, *args):
-        """Call a single-record lookup and convert its dict to ``model``."""
-        result = getattr(self._provider, method)(*args)
-        if result is None:
-            # version 4 allowed None for "not found"; version 5 raises
-            msg = f"{type(self._provider).__name__}.{method}{args!r} returned no data"
-            raise HGVSDataNotAvailableError(msg)
-        return from_mapping(model, result)
-
-    def _many(self, method, model, *args):
-        """Call a list lookup and convert each dict to ``model``."""
-        return [from_mapping(model, r) for r in getattr(self._provider, method)(*args)]
+    def _not_found(self, method, *args) -> NoReturn:
+        # version 4 allowed None for "not found"; version 5 raises
+        msg = f"{type(self._provider).__name__}.{method}{args!r} returned no data"
+        raise HGVSDataNotAvailableError(msg)
 
     # -- unchanged contract: delegated as-is -------------------------------
 
@@ -282,39 +273,113 @@ class _V4Bridge(Interface):
     # -- changed contract: dict results become models ------------------------
 
     def get_gene_info(self, gene: str) -> GeneInfo:
-        return self._single("get_gene_info", GeneInfo, gene)
+        d = self._provider.get_gene_info(gene)
+        if d is None:
+            self._not_found("get_gene_info", gene)
+        return GeneInfo(
+            hgnc=d["hgnc"],
+            symbol=d["symbol"],
+            gene_id=d["gene_id"],
+            maploc=d["maploc"],
+            descr=d["descr"],
+            summary=d["summary"],
+            aliases=d["aliases"],
+            type=d["type"],
+            xrefs=d["xrefs"],
+            added=d["added"],
+        )
 
     def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
-        return self._many("get_similar_transcripts", SimilarTranscript, tx_ac)
+        return [
+            SimilarTranscript(
+                tx_ac1=d["tx_ac1"],
+                tx_ac2=d["tx_ac2"],
+                hgnc_eq=d["hgnc_eq"],
+                cds_eq=d["cds_eq"],
+                es_fp_eq=d["es_fp_eq"],
+                cds_es_fp_eq=d["cds_es_fp_eq"],
+                cds_exon_lengths_fp_eq=d["cds_exon_lengths_fp_eq"],
+            )
+            for d in self._provider.get_similar_transcripts(tx_ac)
+        ]
 
     def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
-        result = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
-        if result is None:
-            msg = (
-                f"{type(self._provider).__name__}.get_tx_exons"
-                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
+        ds = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
+        if ds is None:
+            self._not_found("get_tx_exons", tx_ac, alt_ac, alt_aln_method)
+        return [
+            TranscriptExon(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                alt_strand=d["alt_strand"],
+                ord=d["ord"],
+                tx_start_i=d["tx_start_i"],
+                tx_end_i=d["tx_end_i"],
+                alt_start_i=d["alt_start_i"],
+                alt_end_i=d["alt_end_i"],
+                cigar=d["cigar"],
+                hgnc=d["hgnc"],
             )
-            raise HGVSDataNotAvailableError(msg)
-        return [from_mapping(TranscriptExon, r) for r in result]
+            for d in ds
+        ]
 
     def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
-        return self._many("get_tx_for_gene", TranscriptInfo, gene)
+        return [self._tx_info(d) for d in self._provider.get_tx_for_gene(gene)]
 
     def get_tx_for_region(
         self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
     ) -> list[TranscriptAlignment]:
-        return self._many(
-            "get_tx_for_region", TranscriptAlignment, alt_ac, alt_aln_method, start_i, end_i
-        )
+        return [
+            TranscriptAlignment(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                alt_strand=d["alt_strand"],
+                start_i=d["start_i"],
+                end_i=d["end_i"],
+            )
+            for d in self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
+        ]
 
     def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
-        return self._single("get_tx_identity_info", TranscriptIdentityInfo, tx_ac)
+        d = self._provider.get_tx_identity_info(tx_ac)
+        if d is None:
+            self._not_found("get_tx_identity_info", tx_ac)
+        return TranscriptIdentityInfo(
+            tx_ac=d["tx_ac"],
+            alt_ac=d["alt_ac"],
+            alt_aln_method=d["alt_aln_method"],
+            cds_start_i=d["cds_start_i"],
+            cds_end_i=d["cds_end_i"],
+            lengths=tuple(d["lengths"]),
+            hgnc=d["hgnc"],
+        )
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
-        return self._single("get_tx_info", TranscriptInfo, tx_ac, alt_ac, alt_aln_method)
+        d = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
+        if d is None:
+            self._not_found("get_tx_info", tx_ac, alt_ac, alt_aln_method)
+        return self._tx_info(d)
 
     def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
-        return self._many("get_tx_mapping_options", TranscriptMappingOption, tx_ac)
+        return [
+            TranscriptMappingOption(
+                tx_ac=d["tx_ac"], alt_ac=d["alt_ac"], alt_aln_method=d["alt_aln_method"]
+            )
+            for d in self._provider.get_tx_mapping_options(tx_ac)
+        ]
+
+    @staticmethod
+    def _tx_info(d) -> TranscriptInfo:
+        return TranscriptInfo(
+            tx_ac=d["tx_ac"],
+            alt_ac=d["alt_ac"],
+            alt_aln_method=d["alt_aln_method"],
+            cds_start_i=d["cds_start_i"],
+            cds_end_i=d["cds_end_i"],
+            hgnc=d["hgnc"],
+        )
 
 
 # <LICENSE>

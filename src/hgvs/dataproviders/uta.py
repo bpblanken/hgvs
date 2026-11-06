@@ -31,7 +31,6 @@ from .models import (
     TranscriptIdentityInfo,
     TranscriptInfo,
     TranscriptMappingOption,
-    from_mapping,
 )
 from .seqfetcher import SeqFetcher
 
@@ -221,6 +220,17 @@ class UTABase(Interface):
     ############################################################################
     # Queries
 
+    @staticmethod
+    def _tx_info_from_row(row) -> TranscriptInfo:
+        return TranscriptInfo(
+            tx_ac=row["tx_ac"],
+            alt_ac=row["alt_ac"],
+            alt_aln_method=row["alt_aln_method"],
+            cds_start_i=row["cds_start_i"],
+            cds_end_i=row["cds_end_i"],
+            hgnc=row["hgnc"],
+        )
+
     def data_version(self):
         return self.url.schema
 
@@ -274,7 +284,18 @@ class UTABase(Interface):
         if row is None:
             msg = f"No gene_info for (gene={gene})"
             raise HGVSDataNotAvailableError(msg)
-        return from_mapping(GeneInfo, row)
+        return GeneInfo(
+            hgnc=row["hgnc"],
+            symbol=row["symbol"],
+            gene_id=row["gene_id"],
+            maploc=row["maploc"],
+            descr=row["descr"],
+            summary=row["summary"],
+            aliases=row["aliases"],
+            type=row["type"],
+            xrefs=row["xrefs"],
+            added=row["added"],
+        )
 
     def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         """
@@ -333,7 +354,22 @@ class UTABase(Interface):
                 f"(tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             )
             raise HGVSDataNotAvailableError(msg)
-        return [from_mapping(TranscriptExon, r) for r in rows]
+        return [
+            TranscriptExon(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                alt_strand=r["alt_strand"],
+                ord=r["ord"],
+                tx_start_i=r["tx_start_i"],
+                tx_end_i=r["tx_end_i"],
+                alt_start_i=r["alt_start_i"],
+                alt_end_i=r["alt_end_i"],
+                cigar=r["cigar"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
     def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
         """
@@ -343,7 +379,7 @@ class UTABase(Interface):
         :type gene: str
         """
         rows = self._fetchall(self._queries["tx_for_gene"], [gene])
-        return [from_mapping(TranscriptInfo, r) for r in rows]
+        return [self._tx_info_from_row(r) for r in rows]
 
     def get_tx_for_region(
         self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
@@ -378,7 +414,17 @@ class UTABase(Interface):
         )
         if alt_aln_method is not None:
             alignments = [a for a in alignments if a["alt_aln_method"] == alt_aln_method]
-        return [from_mapping(TranscriptAlignment, a) for a in alignments]
+        return [
+            TranscriptAlignment(
+                tx_ac=a["tx_ac"],
+                alt_ac=a["alt_ac"],
+                alt_aln_method=a["alt_aln_method"],
+                alt_strand=a["alt_strand"],
+                start_i=a["start_i"],
+                end_i=a["end_i"],
+            )
+            for a in alignments
+        ]
 
     def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         """returns features associated with a single transcript.
@@ -403,7 +449,16 @@ class UTABase(Interface):
         if len(rows) == 0:
             msg = f"No transcript definition for (tx_ac={tx_ac})"
             raise HGVSDataNotAvailableError(msg)
-        return from_mapping(TranscriptIdentityInfo, rows[0])
+        row = rows[0]
+        return TranscriptIdentityInfo(
+            tx_ac=row["tx_ac"],
+            alt_ac=row["alt_ac"],
+            alt_aln_method=row["alt_aln_method"],
+            cds_start_i=row["cds_start_i"],
+            cds_end_i=row["cds_end_i"],
+            lengths=tuple(row["lengths"]),
+            hgnc=row["hgnc"],
+        )
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         """return the TranscriptInfo for supplied accession (tx_ac, alt_ac, alt_aln_method)
@@ -434,7 +489,7 @@ class UTABase(Interface):
             msg = f"No tx_info for (tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             raise HGVSDataNotAvailableError(msg)
         if len(rows) == 1:
-            return from_mapping(TranscriptInfo, rows[0])
+            return self._tx_info_from_row(rows[0])
         msg = (
             f"Multiple ({len(rows)}) replies for tx_info(tx_ac="
             f"{tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
@@ -468,7 +523,12 @@ class UTABase(Interface):
 
         """
         rows = self._fetchall(self._queries["tx_mapping_options"], [tx_ac])
-        return [from_mapping(TranscriptMappingOption, r) for r in rows]
+        return [
+            TranscriptMappingOption(
+                tx_ac=r["tx_ac"], alt_ac=r["alt_ac"], alt_aln_method=r["alt_aln_method"]
+            )
+            for r in rows
+        ]
 
     def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
         """Return a list of transcripts that are similar to the given
@@ -498,7 +558,18 @@ class UTABase(Interface):
         """
 
         rows = self._fetchall(self._queries["tx_similar"], [tx_ac])
-        return [from_mapping(SimilarTranscript, r) for r in rows]
+        return [
+            SimilarTranscript(
+                tx_ac1=r["tx_ac1"],
+                tx_ac2=r["tx_ac2"],
+                hgnc_eq=r["hgnc_eq"],
+                cds_eq=r["cds_eq"],
+                es_fp_eq=r["es_fp_eq"],
+                cds_es_fp_eq=r["cds_es_fp_eq"],
+                cds_exon_lengths_fp_eq=r["cds_exon_lengths_fp_eq"],
+            )
+            for r in rows
+        ]
 
     def get_pro_ac_for_tx_ac(self, tx_ac):
         """Return the (single) associated protein accession for a given transcript

@@ -11,20 +11,7 @@ marks an interbase coordinate.
 """
 
 import datetime
-from collections.abc import Mapping
-from dataclasses import dataclass, fields
-from typing import Any, TypeVar
-
-_M = TypeVar("_M")
-
-
-def from_mapping(model: type[_M], mapping: Mapping[str, Any]) -> _M:
-    """Build ``model`` from any mapping keyed by its field names.
-
-    Keys the model does not declare are ignored, so a provider can pass
-    its native row straight through.  A missing field raises ``KeyError``.
-    """
-    return model(**{f.name: mapping[f.name] for f in fields(model)})  # type: ignore[arg-type]
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,10 +60,6 @@ class TranscriptIdentityInfo:
     cds_end_i: int | None
     lengths: tuple[int, ...]
     hgnc: str | None
-
-    def __post_init__(self):
-        # providers commonly hand over a list; keep the model immutable
-        object.__setattr__(self, "lengths", tuple(self.lengths))
 
 
 @dataclass(frozen=True, slots=True)
