@@ -10,7 +10,16 @@ import hgvs
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
-from .models import TranscriptInfo
+from .models import (
+    GeneInfo,
+    SimilarTranscript,
+    TranscriptAlignment,
+    TranscriptExon,
+    TranscriptIdentityInfo,
+    TranscriptInfo,
+    TranscriptMappingOption,
+    from_mapping,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -34,12 +43,16 @@ class Interface(metaclass=abc.ABCMeta):
     data provider implementation should be a subclass (possibly
     indirect) of this class.
 
-    Methods that look up a single sequence, transcript or alignment
-    (``get_seq``, ``get_tx_info``, ``get_tx_exons``,
-    ``get_tx_identity_info``) raise
+    Methods that look up a single sequence, gene, transcript or
+    alignment (``get_seq``, ``get_gene_info``, ``get_tx_info``,
+    ``get_tx_exons``, ``get_tx_identity_info``) raise
     :class:`hgvs.exceptions.HGVSDataNotAvailableError` when nothing is
-    found; they never return ``None``.  Callers rely on this and do not
-    check the result.
+    found; they never return ``None``.  Methods that return a list
+    return an empty list when nothing matches.  Callers rely on this
+    and do not check the result.
+
+    Results are the models in :mod:`hgvs.dataproviders.models`; a
+    provider maps its own storage schema onto them.
 
     .. _`Universal Transcript Archive (UTA)`: https://github.com/biocommons/uta
     .. _Invitae: http://invitae.com/
@@ -55,7 +68,8 @@ class Interface(metaclass=abc.ABCMeta):
         Version 4 providers return plain dicts keyed by the UTA column
         names.  The bridge presents such a provider through this
         interface: methods whose contract is unchanged are delegated
-        as-is, and methods that now return models convert the dict.
+        as-is, and methods that now return models convert the dicts.
+        Keys the models do not declare are ignored.
 
         >>> hdp = Interface.from_v4(legacy_provider)  # doctest: +SKIP
 
@@ -169,7 +183,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_gene_info(self, gene):
+    def get_gene_info(self, gene: str) -> GeneInfo:
         pass
 
     @abc.abstractmethod
@@ -181,23 +195,25 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_similar_transcripts(self, tx_ac):
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
         pass
 
     @abc.abstractmethod
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         pass
 
     @abc.abstractmethod
-    def get_tx_for_gene(self, gene):
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
         pass
 
     @abc.abstractmethod
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
         pass
 
     @abc.abstractmethod
-    def get_tx_identity_info(self, tx_ac):
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         pass
 
     @abc.abstractmethod
@@ -205,7 +221,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_mapping_options(self, tx_ac):
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
         pass
 
 
@@ -230,6 +246,19 @@ class _V4Bridge(Interface):
     def required_version(self):
         return self._provider.required_version
 
+    def _single(self, method, model, *args):
+        """Call a single-record lookup and convert its dict to ``model``."""
+        result = getattr(self._provider, method)(*args)
+        if result is None:
+            # version 4 allowed None for "not found"; version 5 raises
+            msg = f"{type(self._provider).__name__}.{method}{args!r} returned no data"
+            raise HGVSDataNotAvailableError(msg)
+        return from_mapping(model, result)
+
+    def _many(self, method, model, *args):
+        """Call a list lookup and convert each dict to ``model``."""
+        return [from_mapping(model, r) for r in getattr(self._provider, method)(*args)]
+
     # -- unchanged contract: delegated as-is -------------------------------
 
     def data_version(self):
@@ -244,45 +273,48 @@ class _V4Bridge(Interface):
     def get_assembly_map(self, assembly_name):
         return self._provider.get_assembly_map(assembly_name)
 
-    def get_gene_info(self, gene):
-        return self._provider.get_gene_info(gene)
-
     def get_pro_ac_for_tx_ac(self, tx_ac):
         return self._provider.get_pro_ac_for_tx_ac(tx_ac)
 
     def get_seq(self, ac, start_i=None, end_i=None):
         return self._provider.get_seq(ac, start_i, end_i)
 
-    def get_similar_transcripts(self, tx_ac):
-        return self._provider.get_similar_transcripts(tx_ac)
-
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
-        return self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
-
-    def get_tx_for_gene(self, gene):
-        return self._provider.get_tx_for_gene(gene)
-
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
-        return self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
-
-    def get_tx_identity_info(self, tx_ac):
-        return self._provider.get_tx_identity_info(tx_ac)
-
-    def get_tx_mapping_options(self, tx_ac):
-        return self._provider.get_tx_mapping_options(tx_ac)
-
     # -- changed contract: dict results become models ------------------------
 
-    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
-        result = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
+    def get_gene_info(self, gene: str) -> GeneInfo:
+        return self._single("get_gene_info", GeneInfo, gene)
+
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
+        return self._many("get_similar_transcripts", SimilarTranscript, tx_ac)
+
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
+        result = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
         if result is None:
-            # version 4 allowed None for "not found"; version 5 raises
             msg = (
-                f"{type(self._provider).__name__}.get_tx_info"
+                f"{type(self._provider).__name__}.get_tx_exons"
                 f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
             )
             raise HGVSDataNotAvailableError(msg)
-        return TranscriptInfo(**result)
+        return [from_mapping(TranscriptExon, r) for r in result]
+
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
+        return self._many("get_tx_for_gene", TranscriptInfo, gene)
+
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
+        return self._many(
+            "get_tx_for_region", TranscriptAlignment, alt_ac, alt_aln_method, start_i, end_i
+        )
+
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
+        return self._single("get_tx_identity_info", TranscriptIdentityInfo, tx_ac)
+
+    def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
+        return self._single("get_tx_info", TranscriptInfo, tx_ac, alt_ac, alt_aln_method)
+
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
+        return self._many("get_tx_mapping_options", TranscriptMappingOption, tx_ac)
 
 
 # <LICENSE>

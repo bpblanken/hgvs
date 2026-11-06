@@ -14,6 +14,7 @@ import hgvs.location
 import hgvs.posedit
 import hgvs.sequencevariant
 import hgvs.variantmapper
+from hgvs.dataproviders.models import TranscriptMappingOption
 from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError
 from support import CACHE
 
@@ -43,9 +44,8 @@ class UTA_Base:
 
     def test_get_gene_info(self):
         gene_info = self.hdp.get_gene_info("VHL")
-        assert gene_info["hgnc"] == "VHL"
-        assert gene_info["maploc"] == "3p25.3"
-        assert len(gene_info) == 10
+        assert gene_info.hgnc == "VHL"
+        assert gene_info.maploc == "3p25.3"
 
     def test_get_tx_exons(self):
         tx_exons = self.hdp.get_tx_exons("NM_000551.3", "NC_000003.11", "splign")
@@ -74,7 +74,7 @@ class UTA_Base:
         found = 0
         for row in tig:
             for t_tx_ac, t_alt_ac in expected_data:
-                if t_tx_ac == row["tx_ac"] and t_alt_ac == row["alt_ac"]:
+                if t_tx_ac == row.tx_ac and t_alt_ac == row.alt_ac:
                     found += 1
 
         assert found == 3
@@ -95,16 +95,10 @@ class UTA_Base:
 
     def test_get_tx_mapping_options(self):
         tx_mapping_options = self.hdp.get_tx_mapping_options("NM_000551.3")
-        assert {
-            "tx_ac": "NM_000551.3",
-            "alt_ac": "NC_000003.11",
-            "alt_aln_method": "splign",
-        } in tx_mapping_options
-        assert {
-            "tx_ac": "NM_000551.3",
-            "alt_ac": "NC_000003.11",
-            "alt_aln_method": "blat",
-        } in tx_mapping_options
+        assert (
+            TranscriptMappingOption("NM_000551.3", "NC_000003.11", "splign") in tx_mapping_options
+        )
+        assert TranscriptMappingOption("NM_000551.3", "NC_000003.11", "blat") in tx_mapping_options
 
     def test_get_tx_mapping_options_invalid(self):
         tx_info_options = self.hdp.get_tx_mapping_options("NM_999999.9")

@@ -96,9 +96,9 @@ class AlignmentMapper:
 
             # hgvs-386: An assumption when building the cigar string
             # is that exons are adjacent. Assert that here.
-            sorted_tx_exons = sorted(tx_exons, key=lambda e: e["ord"])
+            sorted_tx_exons = sorted(tx_exons, key=lambda e: e.ord)
             for i in range(1, len(sorted_tx_exons)):
-                if sorted_tx_exons[i - 1]["tx_end_i"] != sorted_tx_exons[i]["tx_start_i"]:
+                if sorted_tx_exons[i - 1].tx_end_i != sorted_tx_exons[i].tx_start_i:
                     msg = (
                         f"AlignmentMapper(tx_ac={self.tx_ac}, "
                         f"alt_ac={self.alt_ac}, alt_aln_method={self.alt_aln_method}): "
@@ -106,8 +106,8 @@ class AlignmentMapper:
                     )
                     raise HGVSDataNotAvailableError(msg)
 
-            self.strand = tx_exons[0]["alt_strand"]
-            self.gc_offset = tx_exons[0]["alt_start_i"]
+            self.strand = tx_exons[0].alt_strand
+            self.gc_offset = tx_exons[0].alt_start_i
             self.cds_start_i = tx_info.cds_start_i
             self.cds_end_i = tx_info.cds_end_i
 
@@ -118,9 +118,9 @@ class AlignmentMapper:
         else:
             # this covers the identity cases n <-> c
             tx_identity_info = hdp.get_tx_identity_info(self.tx_ac)
-            self.cds_start_i = tx_identity_info["cds_start_i"]
-            self.cds_end_i = tx_identity_info["cds_end_i"]
-            self.tgt_len = sum(tx_identity_info["lengths"])
+            self.cds_start_i = tx_identity_info.cds_start_i
+            self.cds_end_i = tx_identity_info.cds_end_i
+            self.tgt_len = sum(tx_identity_info.lengths)
             self.cigarmapper = None
 
         assert not ((self.cds_start_i is None) ^ (self.cds_end_i is None)), (
