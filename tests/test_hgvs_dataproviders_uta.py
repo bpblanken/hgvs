@@ -1,5 +1,6 @@
 """Tests uta postgresql client"""
 
+import datetime
 import os
 import re
 import unittest
@@ -46,6 +47,24 @@ class UTA_Base:
         gene_info = self.hdp.get_gene_info("VHL")
         assert gene_info.hgnc == "VHL"
         assert gene_info.maploc == "3p25.3"
+
+    def test_get_gene_info_without_post_2021_columns(self):
+        """uta_20210129b's gene table lacks symbol, gene_id, type and xrefs."""
+        row = {
+            "hgnc": "VHL",
+            "maploc": "3p25.3",
+            "descr": "von Hippel-Lindau tumor suppressor",
+            "summary": "von Hippel-Lindau tumor suppressor",
+            "aliases": "HRCA1,RCA1,VHL1,pVHL",
+            "added": datetime.datetime(2014, 2, 10, 22, 59, 21),  # noqa: DTZ001 - UTA stores naive
+        }
+        with patch.object(self.hdp, "_fetchone", return_value=row):
+            # the class attribute is the uncached method
+            gene_info = type(self.hdp).get_gene_info(self.hdp, "VHL")
+        assert gene_info.hgnc == "VHL"
+        assert gene_info.symbol is None
+        assert gene_info.gene_id is None
+        assert gene_info.added.tzinfo is None
 
     def test_get_tx_exons(self):
         tx_exons = self.hdp.get_tx_exons("NM_000551.3", "NC_000003.11", "splign")

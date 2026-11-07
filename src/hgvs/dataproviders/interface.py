@@ -275,14 +275,14 @@ class _V4Bridge(Interface):
             raise HGVSDataNotAvailableError(msg)
         return GeneInfo(
             hgnc=d["hgnc"],
-            symbol=d["symbol"],
-            gene_id=d["gene_id"],
+            symbol=d.get("symbol"),
+            gene_id=d.get("gene_id"),
             maploc=d["maploc"],
             descr=d["descr"],
             summary=d["summary"],
             aliases=d["aliases"],
-            type=d["type"],
-            xrefs=d["xrefs"],
+            type=d.get("type"),
+            xrefs=d.get("xrefs"),
             added=d["added"],
         )
 

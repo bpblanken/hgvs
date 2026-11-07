@@ -154,6 +154,9 @@ class SimilarTranscript:
 class GeneInfo:
     """Basic information about a gene.
 
+    ``symbol``, ``gene_id``, ``type`` and ``xrefs`` are ``None`` when the
+    provider does not carry them; UTA schemas before 2024 do not.
+
     :param hgnc: HGNC gene symbol
     :param symbol: display symbol, usually the same as ``hgnc``
     :param gene_id: gene identifier in the provider's source
@@ -161,9 +164,10 @@ class GeneInfo:
     :param descr: description
     :param summary: longer summary
     :param aliases: comma-separated alias symbols
-    :param type: gene type, if known
-    :param xrefs: cross-references, if known
-    :param added: when the record was added to the provider's source
+    :param type: gene type
+    :param xrefs: cross-references
+    :param added: when the record was added to the provider's source; a
+        naive datetime, as UTA stores it without a timezone
     """
 
     hgnc: str

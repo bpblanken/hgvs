@@ -273,16 +273,18 @@ class UTABase(Interface):
         if row is None:
             msg = f"No gene_info for (gene={gene})"
             raise HGVSDataNotAvailableError(msg)
+        # symbol, gene_id, type and xrefs were added to the gene table after
+        # uta_20210129b; older schemas do not have them
         return GeneInfo(
             hgnc=row["hgnc"],
-            symbol=row["symbol"],
-            gene_id=row["gene_id"],
+            symbol=row.get("symbol"),
+            gene_id=row.get("gene_id"),
             maploc=row["maploc"],
             descr=row["descr"],
             summary=row["summary"],
             aliases=row["aliases"],
-            type=row["type"],
-            xrefs=row["xrefs"],
+            type=row.get("type"),
+            xrefs=row.get("xrefs"),
             added=row["added"],
         )
 
