@@ -224,8 +224,8 @@ class Normalizer:
             if not map_info:
                 msg = f"No mapping info available for {var.ac}"
                 raise HGVSDataNotAvailableError(msg)
-            map_info = [item for item in map_info if item["alt_aln_method"] == self.alt_aln_method]
-            alt_ac = map_info[0]["alt_ac"]
+            map_info = [item for item in map_info if item.alt_aln_method == self.alt_aln_method]
+            alt_ac = map_info[0].alt_ac
 
             # Get tx info
             tx_info = self.hdp.get_tx_info(var.ac, alt_ac, self.alt_aln_method)

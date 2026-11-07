@@ -23,7 +23,7 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
-from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo
+from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo, TranscriptMappingOption
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -453,7 +453,7 @@ class UTABase(Interface):
         )
         raise HGVSError(msg)
 
-    def get_tx_mapping_options(self, tx_ac):
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
         """Return all transcript alignment sets for a given transcript
         accession (tx_ac); returns empty list if transcript does not
         exist.  Use this method to discovery possible mapping options
@@ -480,7 +480,12 @@ class UTABase(Interface):
 
         """
         rows = self._fetchall(self._queries["tx_mapping_options"], [tx_ac])
-        return rows
+        return [
+            TranscriptMappingOption(
+                tx_ac=r["tx_ac"], alt_ac=r["alt_ac"], alt_aln_method=r["alt_aln_method"]
+            )
+            for r in rows
+        ]
 
     def get_similar_transcripts(self, tx_ac):
         """Return a list of transcripts that are similar to the given

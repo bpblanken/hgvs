@@ -91,6 +91,20 @@ class TranscriptExon:
     hgnc: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class TranscriptMappingOption:
+    """A reference sequence and method a transcript has an alignment for.
+
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference sequence accession the transcript is aligned to
+    :param alt_aln_method: alignment method (e.g., ``splign``, ``blat``)
+    """
+
+    tx_ac: str
+    alt_ac: str
+    alt_aln_method: str
+
+
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)
 #

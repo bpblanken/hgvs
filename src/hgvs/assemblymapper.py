@@ -195,10 +195,10 @@ class AssemblyMapper(VariantMapper):
 
         """
         alt_acs = [
-            e["alt_ac"]
+            e.alt_ac
             for e in self.hdp.get_tx_mapping_options(tx_ac)
-            if e["alt_aln_method"] == self.alt_aln_method
-            and e["alt_ac"] in self._assembly_accessions
+            if e.alt_aln_method == self.alt_aln_method
+            and e.alt_ac in self._assembly_accessions
         ]
 
         if not alt_acs:

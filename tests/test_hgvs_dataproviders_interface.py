@@ -72,6 +72,9 @@ class V4Provider(Interface):
     def get_tx_identity_info(self, tx_ac):
         return {**TX_IDENTITY_DICT, "tx_ac": tx_ac, "alt_ac": tx_ac}
 
+    def get_tx_mapping_options(self, tx_ac):
+        return [{"tx_ac": tx_ac, "alt_ac": "AC_000143.1", "alt_aln_method": "splign"}]
+
     # the remaining abstract methods are not exercised here
     def get_acs_for_protein_seq(self, seq):
         raise NotImplementedError
@@ -95,9 +98,6 @@ class V4Provider(Interface):
         raise NotImplementedError
 
     def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
-        raise NotImplementedError
-
-    def get_tx_mapping_options(self, tx_ac):
         raise NotImplementedError
 
 
@@ -154,6 +154,7 @@ def test_bridge_converts_list_results_and_ignores_undeclared_keys():
             hgnc="ATM",
         )
     ]
+    assert [o.alt_ac for o in hdp.get_tx_mapping_options("NM_000051.3")] == ["AC_000143.1"]
 
 
 def test_bridge_converts_identity_info_with_tuple_lengths():

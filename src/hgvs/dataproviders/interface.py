@@ -10,7 +10,7 @@ import hgvs
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
-from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo
+from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo, TranscriptMappingOption
 
 _logger = logging.getLogger(__name__)
 
@@ -209,7 +209,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_mapping_options(self, tx_ac):
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
         pass
 
 
@@ -306,8 +306,13 @@ class _V4Bridge(Interface):
             hgnc=result["hgnc"],
         )
 
-    def get_tx_mapping_options(self, tx_ac):
-        return self._provider.get_tx_mapping_options(tx_ac)
+    def get_tx_mapping_options(self, tx_ac: str) -> list[TranscriptMappingOption]:
+        return [
+            TranscriptMappingOption(
+                tx_ac=d["tx_ac"], alt_ac=d["alt_ac"], alt_aln_method=d["alt_aln_method"]
+            )
+            for d in self._provider.get_tx_mapping_options(tx_ac)
+        ]
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         result = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)
