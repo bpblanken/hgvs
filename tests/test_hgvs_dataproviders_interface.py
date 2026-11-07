@@ -96,9 +96,11 @@ def test_bridge_turns_none_tx_info_into_data_not_available():
         hdp.get_tx_info(*TX_INFO_ARGS)
 
 
-def test_bridge_rejects_dict_with_unknown_keys():
-    hdp = Interface.from_v4(V4Provider({**TX_INFO_DICT, "bogus": 1}))
-    with pytest.raises(TypeError, match="bogus"):
+def test_bridge_reads_only_declared_keys_and_reports_missing_ones():
+    hdp = Interface.from_v4(V4Provider({**TX_INFO_DICT, "tx_exon_set_id": 1}))
+    assert hdp.get_tx_info(*TX_INFO_ARGS) == TX_INFO
+    hdp = Interface.from_v4(V4Provider({k: v for k, v in TX_INFO_DICT.items() if k != "hgnc"}))
+    with pytest.raises(KeyError, match="hgnc"):
         hdp.get_tx_info(*TX_INFO_ARGS)
 
 

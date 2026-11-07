@@ -282,7 +282,14 @@ class _V4Bridge(Interface):
                 f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
             )
             raise HGVSDataNotAvailableError(msg)
-        return TranscriptInfo(**result)
+        return TranscriptInfo(
+            tx_ac=result["tx_ac"],
+            alt_ac=result["alt_ac"],
+            alt_aln_method=result["alt_aln_method"],
+            cds_start_i=result["cds_start_i"],
+            cds_end_i=result["cds_end_i"],
+            hgnc=result["hgnc"],
+        )
 
 
 # <LICENSE>
