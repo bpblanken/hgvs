@@ -3,7 +3,7 @@
 import pytest
 
 from hgvs.dataproviders.interface import Interface
-from hgvs.dataproviders.models import TranscriptIdentityInfo, TranscriptInfo
+from hgvs.dataproviders.models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo
 from hgvs.exceptions import HGVSDataNotAvailableError
 
 TX_INFO_DICT = {
@@ -15,6 +15,23 @@ TX_INFO_DICT = {
     "alt_aln_method": "splign",
 }
 TX_INFO = TranscriptInfo(**TX_INFO_DICT)
+# a version 4 exon row carries UTA-internal columns the model does not declare
+EXON_DICT = {
+    "tx_ac": "NM_000051.3",
+    "alt_ac": "AC_000143.1",
+    "alt_aln_method": "splign",
+    "alt_strand": 1,
+    "ord": 0,
+    "tx_start_i": 0,
+    "tx_end_i": 100,
+    "alt_start_i": 1000,
+    "alt_end_i": 1100,
+    "cigar": "100=",
+    "hgnc": "ATM",
+    "tx_exon_id": 7,
+    "exon_aln_id": 8,
+    "tx_aseq": None,
+}
 TX_IDENTITY_DICT = {
     "tx_ac": "NM_000051.3",
     "alt_ac": "NM_000051.3",
@@ -50,7 +67,7 @@ class V4Provider(Interface):
 
     def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
         self.calls.append(("get_tx_exons", tx_ac, alt_ac, alt_aln_method))
-        return [{"tx_ac": tx_ac, "alt_ac": alt_ac, "alt_aln_method": alt_aln_method}]
+        return [dict(EXON_DICT, tx_ac=tx_ac, alt_ac=alt_ac, alt_aln_method=alt_aln_method)]
 
     def get_tx_identity_info(self, tx_ac):
         return {**TX_IDENTITY_DICT, "tx_ac": tx_ac, "alt_ac": tx_ac}
@@ -114,11 +131,29 @@ def test_bridge_reads_only_declared_keys_and_reports_missing_ones():
 
 
 def test_bridge_delegates_unchanged_methods_as_is():
-    provider = V4Provider(dict(TX_INFO_DICT))
-    hdp = Interface.from_v4(provider)
-    assert hdp.get_tx_exons(*TX_INFO_ARGS) == provider.get_tx_exons(*TX_INFO_ARGS)
+    hdp = Interface.from_v4(V4Provider(dict(TX_INFO_DICT)))
     assert hdp.schema_version() == "1.1"
     assert hdp.data_version() == "fake"
+
+
+def test_bridge_converts_list_results_and_ignores_undeclared_keys():
+    hdp = Interface.from_v4(V4Provider(dict(TX_INFO_DICT)))
+    exons = hdp.get_tx_exons(*TX_INFO_ARGS)
+    assert exons == [
+        TranscriptExon(
+            tx_ac="NM_000051.3",
+            alt_ac="AC_000143.1",
+            alt_aln_method="splign",
+            alt_strand=1,
+            ord=0,
+            tx_start_i=0,
+            tx_end_i=100,
+            alt_start_i=1000,
+            alt_end_i=1100,
+            cigar="100=",
+            hgnc="ATM",
+        )
+    ]
 
 
 def test_bridge_converts_identity_info_with_tuple_lengths():

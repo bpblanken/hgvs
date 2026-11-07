@@ -19,14 +19,14 @@ def build_tx_cigar(exons, strand):
         return None
 
     # flip orientation of all CIGARs if on - strand
-    if strand == -1:
-        cigars = [_reverse_cigar(e["cigar"]) for e in exons]
+    if strand == -1:  # noqa: SIM108
+        cigars = [_reverse_cigar(e.cigar) for e in exons]
     else:
-        cigars = [e["cigar"] for e in exons]
+        cigars = [e.cigar for e in exons]
 
     tx_cigar = [cigars[0]]  # exon 1
     for i in range(1, len(cigars)):  # and intron + exon pairs thereafter
-        intron = str(exons[i]["alt_start_i"] - exons[i - 1]["alt_end_i"]) + "N"
+        intron = str(exons[i].alt_start_i - exons[i - 1].alt_end_i) + "N"
         tx_cigar += [intron, cigars[i]]
 
     tx_cigar_str = "".join(tx_cigar)

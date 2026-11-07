@@ -234,8 +234,8 @@ class Normalizer:
 
             # Get exon info
             exon_info = self.hdp.get_tx_exons(var.ac, alt_ac, self.alt_aln_method)
-            exon_starts = [exon["tx_start_i"] for exon in exon_info]
-            exon_ends = [exon["tx_end_i"] for exon in exon_info]
+            exon_starts = [exon.tx_start_i for exon in exon_info]
+            exon_ends = [exon.tx_end_i for exon in exon_info]
             exon_starts.sort()
             exon_ends.sort()
             exon_starts.append(exon_ends[-1])

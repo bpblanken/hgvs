@@ -61,6 +61,36 @@ class TranscriptIdentityInfo:
     hgnc: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class TranscriptExon:
+    """One exon of a transcript aligned to a reference sequence.
+
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference sequence accession
+    :param alt_aln_method: alignment method
+    :param alt_strand: strand of the alignment on the reference, ``1`` or ``-1``
+    :param ord: exon ordinal in transcript order, starting at 0
+    :param tx_start_i: exon start on the transcript
+    :param tx_end_i: exon end on the transcript
+    :param alt_start_i: exon start on the reference
+    :param alt_end_i: exon end on the reference
+    :param cigar: CIGAR string of the exon alignment, transcript to reference
+    :param hgnc: HGNC gene symbol, or ``None`` if not known
+    """
+
+    tx_ac: str
+    alt_ac: str
+    alt_aln_method: str
+    alt_strand: int
+    ord: int
+    tx_start_i: int
+    tx_end_i: int
+    alt_start_i: int
+    alt_end_i: int
+    cigar: str
+    hgnc: str | None
+
+
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)
 #

@@ -10,7 +10,7 @@ import hgvs
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
-from .models import TranscriptIdentityInfo, TranscriptInfo
+from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo
 
 _logger = logging.getLogger(__name__)
 
@@ -38,8 +38,9 @@ class Interface(metaclass=abc.ABCMeta):
     (``get_seq``, ``get_tx_info``, ``get_tx_exons``,
     ``get_tx_identity_info``) raise
     :class:`hgvs.exceptions.HGVSDataNotAvailableError` when nothing is
-    found; they never return ``None``.  Callers rely on this and do not
-    check the result.
+    found; they never return ``None``.  Methods that return a list
+    return an empty list when nothing matches.  Callers rely on this
+    and do not check the result.
 
     Results are the models in :mod:`hgvs.dataproviders.models`; a
     provider maps its own storage schema onto them.
@@ -188,7 +189,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         pass
 
     @abc.abstractmethod
@@ -257,8 +258,30 @@ class _V4Bridge(Interface):
     def get_similar_transcripts(self, tx_ac):
         return self._provider.get_similar_transcripts(tx_ac)
 
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
-        return self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
+        result = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)
+        if result is None:
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_exons"
+                f"({tx_ac!r}, {alt_ac!r}, {alt_aln_method!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
+        return [
+            TranscriptExon(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                alt_strand=d["alt_strand"],
+                ord=d["ord"],
+                tx_start_i=d["tx_start_i"],
+                tx_end_i=d["tx_end_i"],
+                alt_start_i=d["alt_start_i"],
+                alt_end_i=d["alt_end_i"],
+                cigar=d["cigar"],
+                hgnc=d["hgnc"],
+            )
+            for d in result
+        ]
 
     def get_tx_for_gene(self, gene):
         return self._provider.get_tx_for_gene(gene)

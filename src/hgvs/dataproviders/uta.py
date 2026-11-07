@@ -23,7 +23,7 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
-from .models import TranscriptIdentityInfo, TranscriptInfo
+from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -261,7 +261,7 @@ class UTABase(Interface):
         """
         return self._fetchone(self._queries["gene_info"], [gene])
 
-    def get_tx_exons(self, tx_ac, alt_ac, alt_aln_method):
+    def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         """
         return transcript exon info for supplied accession (tx_ac, alt_ac, alt_aln_method)
 
@@ -318,7 +318,22 @@ class UTABase(Interface):
                 f"(tx_ac={tx_ac},alt_ac={alt_ac},alt_aln_method={alt_aln_method})"
             )
             raise HGVSDataNotAvailableError(msg)
-        return rows
+        return [
+            TranscriptExon(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                alt_strand=r["alt_strand"],
+                ord=r["ord"],
+                tx_start_i=r["tx_start_i"],
+                tx_end_i=r["tx_end_i"],
+                alt_start_i=r["alt_start_i"],
+                alt_end_i=r["alt_end_i"],
+                cigar=r["cigar"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
     def get_tx_for_gene(self, gene):
         """
