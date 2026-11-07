@@ -11,6 +11,7 @@ from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
 from .models import (
+    GeneInfo,
     SimilarTranscript,
     TranscriptAlignment,
     TranscriptExon,
@@ -41,9 +42,9 @@ class Interface(metaclass=abc.ABCMeta):
     data provider implementation should be a subclass (possibly
     indirect) of this class.
 
-    Methods that look up a single sequence, transcript or alignment
-    (``get_seq``, ``get_tx_info``, ``get_tx_exons``,
-    ``get_tx_identity_info``) raise
+    Methods that look up a single sequence, gene, transcript or
+    alignment (``get_seq``, ``get_gene_info``, ``get_tx_info``,
+    ``get_tx_exons``, ``get_tx_identity_info``) raise
     :class:`hgvs.exceptions.HGVSDataNotAvailableError` when nothing is
     found; they never return ``None``.  Methods that return a list
     return an empty list when nothing matches.  Callers rely on this
@@ -180,7 +181,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_gene_info(self, gene):
+    def get_gene_info(self, gene: str) -> GeneInfo:
         pass
 
     @abc.abstractmethod
@@ -255,8 +256,23 @@ class _V4Bridge(Interface):
     def get_assembly_map(self, assembly_name):
         return self._provider.get_assembly_map(assembly_name)
 
-    def get_gene_info(self, gene):
-        return self._provider.get_gene_info(gene)
+    def get_gene_info(self, gene: str) -> GeneInfo:
+        result = self._provider.get_gene_info(gene)
+        if result is None:
+            msg = f"{type(self._provider).__name__}.get_gene_info({gene!r}) returned no data"
+            raise HGVSDataNotAvailableError(msg)
+        return GeneInfo(
+            hgnc=result["hgnc"],
+            symbol=result.get("symbol"),
+            gene_id=result.get("gene_id"),
+            maploc=result["maploc"],
+            descr=result["descr"],
+            summary=result["summary"],
+            aliases=result["aliases"],
+            type=result.get("type"),
+            xrefs=result.get("xrefs"),
+            added=result["added"],
+        )
 
     def get_pro_ac_for_tx_ac(self, tx_ac):
         return self._provider.get_pro_ac_for_tx_ac(tx_ac)

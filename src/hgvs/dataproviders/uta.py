@@ -24,6 +24,7 @@ import hgvs
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
 from .models import (
+    GeneInfo,
     SimilarTranscript,
     TranscriptAlignment,
     TranscriptExon,
@@ -250,9 +251,11 @@ class UTABase(Interface):
             "MD5_" + md5
         ]
 
-    def get_gene_info(self, gene):
+    def get_gene_info(self, gene: str) -> GeneInfo:
         """
         returns basic information about the gene.
+
+        :raises HGVSDataNotAvailableError: if no such gene exists
 
         :param gene: HGNC gene name
         :type gene: str
@@ -266,7 +269,24 @@ class UTABase(Interface):
         added   | 2014-02-04 21:39:32.57125
 
         """
-        return self._fetchone(self._queries["gene_info"], [gene])
+        row = self._fetchone(self._queries["gene_info"], [gene])
+        if row is None:
+            msg = f"No gene_info for (gene={gene})"
+            raise HGVSDataNotAvailableError(msg)
+        # symbol, gene_id, type and xrefs were added to the gene table after
+        # uta_20210129b; older schemas do not have them
+        return GeneInfo(
+            hgnc=row["hgnc"],
+            symbol=row.get("symbol"),
+            gene_id=row.get("gene_id"),
+            maploc=row["maploc"],
+            descr=row["descr"],
+            summary=row["summary"],
+            aliases=row["aliases"],
+            type=row.get("type"),
+            xrefs=row.get("xrefs"),
+            added=row["added"],
+        )
 
     def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         """

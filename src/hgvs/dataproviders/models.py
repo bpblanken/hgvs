@@ -10,6 +10,7 @@ marks an interbase coordinate.
 
 """
 
+import datetime
 from dataclasses import dataclass
 
 
@@ -147,6 +148,38 @@ class SimilarTranscript:
     es_fp_eq: bool
     cds_es_fp_eq: bool
     cds_exon_lengths_fp_eq: bool
+
+
+@dataclass(frozen=True, slots=True)
+class GeneInfo:
+    """Basic information about a gene.
+
+    ``symbol``, ``gene_id``, ``type`` and ``xrefs`` are ``None`` when the
+    provider does not carry them; UTA schemas before 2024 do not.
+
+    :param hgnc: HGNC gene symbol
+    :param symbol: display symbol, usually the same as ``hgnc``
+    :param gene_id: gene identifier in the provider's source
+    :param maploc: cytogenetic map location (e.g., ``11q22-q23``)
+    :param descr: description
+    :param summary: longer summary
+    :param aliases: comma-separated alias symbols
+    :param type: gene type
+    :param xrefs: cross-references
+    :param added: when the record was added to the provider's source; a
+        naive datetime, as UTA stores it without a timezone
+    """
+
+    hgnc: str
+    symbol: str | None
+    gene_id: str | None
+    maploc: str | None
+    descr: str | None
+    summary: str | None
+    aliases: str | None
+    type: str | None
+    xrefs: str | None
+    added: datetime.datetime | None
 
 
 # <LICENSE>
