@@ -75,7 +75,7 @@ class UTA_Base:
         found = 0
         for row in tig:
             for t_tx_ac, t_alt_ac in expected_data:
-                if t_tx_ac == row["tx_ac"] and t_alt_ac == row["alt_ac"]:
+                if t_tx_ac == row.tx_ac and t_alt_ac == row.alt_ac:
                     found += 1
 
         assert found == 3

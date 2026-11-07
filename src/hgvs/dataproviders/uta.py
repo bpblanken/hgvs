@@ -335,14 +335,25 @@ class UTABase(Interface):
             for r in rows
         ]
 
-    def get_tx_for_gene(self, gene):
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
         """
         return transcript info records for supplied gene, in order of decreasing length
 
         :param gene: HGNC gene name
         :type gene: str
         """
-        return self._fetchall(self._queries["tx_for_gene"], [gene])
+        rows = self._fetchall(self._queries["tx_for_gene"], [gene])
+        return [
+            TranscriptInfo(
+                tx_ac=r["tx_ac"],
+                alt_ac=r["alt_ac"],
+                alt_aln_method=r["alt_aln_method"],
+                cds_start_i=r["cds_start_i"],
+                cds_end_i=r["cds_end_i"],
+                hgnc=r["hgnc"],
+            )
+            for r in rows
+        ]
 
     def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
         """

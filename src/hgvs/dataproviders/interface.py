@@ -193,7 +193,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_for_gene(self, gene):
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
         pass
 
     @abc.abstractmethod
@@ -283,8 +283,18 @@ class _V4Bridge(Interface):
             for d in result
         ]
 
-    def get_tx_for_gene(self, gene):
-        return self._provider.get_tx_for_gene(gene)
+    def get_tx_for_gene(self, gene: str) -> list[TranscriptInfo]:
+        return [
+            TranscriptInfo(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                cds_start_i=d["cds_start_i"],
+                cds_end_i=d["cds_end_i"],
+                hgnc=d["hgnc"],
+            )
+            for d in self._provider.get_tx_for_gene(gene)
+        ]
 
     def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
         return self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
