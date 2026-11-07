@@ -177,7 +177,7 @@ class ExtrinsicValidator:
         if var.type != "c":
             return (ValidationLevel.VALID, None)
         tx_info = self.hdp.get_tx_identity_info(var.ac)
-        cds_length = tx_info["cds_end_i"] - tx_info["cds_start_i"]
+        cds_length = tx_info.cds_end_i - tx_info.cds_start_i
 
         s, e = get_start_end(var)
 
@@ -197,7 +197,7 @@ class ExtrinsicValidator:
         if var.type != "n":
             return (ValidationLevel.VALID, None)
         tx_info = self.hdp.get_tx_identity_info(var.ac)
-        tx_len = sum(tx_info["lengths"])
+        tx_len = sum(tx_info.lengths)
 
         s, e = get_start_end(var)
 

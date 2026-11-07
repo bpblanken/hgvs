@@ -297,7 +297,7 @@ class Normalizer:
             return float("inf")
         # Get genomic sequence access number for this transcript
         identity_info = self.hdp.get_tx_identity_info(var.ac)
-        tgt_len = sum(identity_info["lengths"])
+        tgt_len = sum(identity_info.lengths)
         return tgt_len
 
     def _fetch_bounded_seq(self, var, start, end, window_size, boundary):

@@ -36,6 +36,31 @@ class TranscriptInfo:
     hgnc: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class TranscriptIdentityInfo:
+    """A transcript described on its own sequence: CDS bounds and exon lengths.
+
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference the transcript is defined on; for a transcript
+        described on itself this is ``tx_ac``
+    :param alt_aln_method: alignment method; ``transcript`` for the identity
+        alignment
+    :param cds_start_i: CDS start on the transcript, or ``None`` if non-coding
+    :param cds_end_i: CDS end on the transcript, or ``None`` if non-coding
+    :param lengths: exon lengths in transcript order; their sum is the
+        transcript length
+    :param hgnc: HGNC gene symbol, or ``None`` if not known
+    """
+
+    tx_ac: str
+    alt_ac: str
+    alt_aln_method: str
+    cds_start_i: int | None
+    cds_end_i: int | None
+    lengths: tuple[int, ...]
+    hgnc: str | None
+
+
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)
 #

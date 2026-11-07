@@ -10,7 +10,7 @@ import hgvs
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
-from .models import TranscriptInfo
+from .models import TranscriptIdentityInfo, TranscriptInfo
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +40,9 @@ class Interface(metaclass=abc.ABCMeta):
     :class:`hgvs.exceptions.HGVSDataNotAvailableError` when nothing is
     found; they never return ``None``.  Callers rely on this and do not
     check the result.
+
+    Results are the models in :mod:`hgvs.dataproviders.models`; a
+    provider maps its own storage schema onto them.
 
     .. _`Universal Transcript Archive (UTA)`: https://github.com/biocommons/uta
     .. _Invitae: http://invitae.com/
@@ -197,7 +200,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_identity_info(self, tx_ac):
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         pass
 
     @abc.abstractmethod
@@ -229,8 +232,6 @@ class _V4Bridge(Interface):
     @property
     def required_version(self):
         return self._provider.required_version
-
-    # -- unchanged contract: delegated as-is -------------------------------
 
     def data_version(self):
         return self._provider.data_version()
@@ -265,13 +266,25 @@ class _V4Bridge(Interface):
     def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
         return self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
 
-    def get_tx_identity_info(self, tx_ac):
-        return self._provider.get_tx_identity_info(tx_ac)
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
+        result = self._provider.get_tx_identity_info(tx_ac)
+        if result is None:
+            msg = (
+                f"{type(self._provider).__name__}.get_tx_identity_info({tx_ac!r}) returned no data"
+            )
+            raise HGVSDataNotAvailableError(msg)
+        return TranscriptIdentityInfo(
+            tx_ac=result["tx_ac"],
+            alt_ac=result["alt_ac"],
+            alt_aln_method=result["alt_aln_method"],
+            cds_start_i=result["cds_start_i"],
+            cds_end_i=result["cds_end_i"],
+            lengths=tuple(result["lengths"]),
+            hgnc=result["hgnc"],
+        )
 
     def get_tx_mapping_options(self, tx_ac):
         return self._provider.get_tx_mapping_options(tx_ac)
-
-    # -- changed contract: dict results become models ------------------------
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         result = self._provider.get_tx_info(tx_ac, alt_ac, alt_aln_method)

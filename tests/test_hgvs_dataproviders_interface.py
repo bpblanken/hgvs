@@ -3,7 +3,7 @@
 import pytest
 
 from hgvs.dataproviders.interface import Interface
-from hgvs.dataproviders.models import TranscriptInfo
+from hgvs.dataproviders.models import TranscriptIdentityInfo, TranscriptInfo
 from hgvs.exceptions import HGVSDataNotAvailableError
 
 TX_INFO_DICT = {
@@ -15,6 +15,15 @@ TX_INFO_DICT = {
     "alt_aln_method": "splign",
 }
 TX_INFO = TranscriptInfo(**TX_INFO_DICT)
+TX_IDENTITY_DICT = {
+    "tx_ac": "NM_000051.3",
+    "alt_ac": "NM_000051.3",
+    "alt_aln_method": "transcript",
+    "cds_start_i": 385,
+    "cds_end_i": 9556,
+    "lengths": [100, 200],
+    "hgnc": "ATM",
+}
 TX_INFO_ARGS = ("NM_000051.3", "AC_000143.1", "splign")
 
 
@@ -43,6 +52,9 @@ class V4Provider(Interface):
         self.calls.append(("get_tx_exons", tx_ac, alt_ac, alt_aln_method))
         return [{"tx_ac": tx_ac, "alt_ac": alt_ac, "alt_aln_method": alt_aln_method}]
 
+    def get_tx_identity_info(self, tx_ac):
+        return {**TX_IDENTITY_DICT, "tx_ac": tx_ac, "alt_ac": tx_ac}
+
     # the remaining abstract methods are not exercised here
     def get_acs_for_protein_seq(self, seq):
         raise NotImplementedError
@@ -66,9 +78,6 @@ class V4Provider(Interface):
         raise NotImplementedError
 
     def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
-        raise NotImplementedError
-
-    def get_tx_identity_info(self, tx_ac):
         raise NotImplementedError
 
     def get_tx_mapping_options(self, tx_ac):
@@ -110,6 +119,13 @@ def test_bridge_delegates_unchanged_methods_as_is():
     assert hdp.get_tx_exons(*TX_INFO_ARGS) == provider.get_tx_exons(*TX_INFO_ARGS)
     assert hdp.schema_version() == "1.1"
     assert hdp.data_version() == "fake"
+
+
+def test_bridge_converts_identity_info_with_tuple_lengths():
+    hdp = Interface.from_v4(V4Provider(dict(TX_INFO_DICT)))
+    info = hdp.get_tx_identity_info("NM_000051.3")
+    assert isinstance(info, TranscriptIdentityInfo)
+    assert info.lengths == (100, 200)
 
 
 def test_bridge_exposes_provider_attributes():

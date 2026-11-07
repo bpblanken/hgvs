@@ -118,9 +118,9 @@ class AlignmentMapper:
         else:
             # this covers the identity cases n <-> c
             tx_identity_info = hdp.get_tx_identity_info(self.tx_ac)
-            self.cds_start_i = tx_identity_info["cds_start_i"]
-            self.cds_end_i = tx_identity_info["cds_end_i"]
-            self.tgt_len = sum(tx_identity_info["lengths"])
+            self.cds_start_i = tx_identity_info.cds_start_i
+            self.cds_end_i = tx_identity_info.cds_end_i
+            self.tgt_len = sum(tx_identity_info.lengths)
             self.cigarmapper = None
 
         assert not ((self.cds_start_i is None) ^ (self.cds_end_i is None)), (

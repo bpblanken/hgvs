@@ -23,7 +23,7 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
-from .models import TranscriptInfo
+from .models import TranscriptIdentityInfo, TranscriptInfo
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -360,7 +360,7 @@ class UTABase(Interface):
             alignments = [a for a in alignments if a["alt_aln_method"] == alt_aln_method]
         return alignments
 
-    def get_tx_identity_info(self, tx_ac):
+    def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         """returns features associated with a single transcript.
 
         :raises HGVSDataNotAvailableError: if no such transcript exists
@@ -383,7 +383,16 @@ class UTABase(Interface):
         if len(rows) == 0:
             msg = f"No transcript definition for (tx_ac={tx_ac})"
             raise HGVSDataNotAvailableError(msg)
-        return rows[0]
+        row = rows[0]
+        return TranscriptIdentityInfo(
+            tx_ac=row["tx_ac"],
+            alt_ac=row["alt_ac"],
+            alt_aln_method=row["alt_aln_method"],
+            cds_start_i=row["cds_start_i"],
+            cds_end_i=row["cds_end_i"],
+            lengths=tuple(row["lengths"]),
+            hgnc=row["hgnc"],
+        )
 
     def get_tx_info(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> TranscriptInfo:
         """return the TranscriptInfo for supplied accession (tx_ac, alt_ac, alt_aln_method)
