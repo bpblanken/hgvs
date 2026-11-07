@@ -105,6 +105,26 @@ class TranscriptMappingOption:
     alt_aln_method: str
 
 
+@dataclass(frozen=True, slots=True)
+class TranscriptAlignment:
+    """The span a transcript's alignment covers on a reference sequence.
+
+    :param tx_ac: transcript accession with version
+    :param alt_ac: reference sequence accession the transcript is aligned to
+    :param alt_aln_method: alignment method (e.g., ``splign``, ``blat``)
+    :param alt_strand: strand of the alignment on the reference, ``1`` or ``-1``
+    :param start_i: alignment start on the reference
+    :param end_i: alignment end on the reference
+    """
+
+    tx_ac: str
+    alt_ac: str
+    alt_aln_method: str
+    alt_strand: int
+    start_i: int
+    end_i: int
+
+
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)
 #

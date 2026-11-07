@@ -10,7 +10,13 @@ import hgvs
 from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
-from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo, TranscriptMappingOption
+from .models import (
+    TranscriptAlignment,
+    TranscriptExon,
+    TranscriptIdentityInfo,
+    TranscriptInfo,
+    TranscriptMappingOption,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -197,7 +203,9 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
         pass
 
     @abc.abstractmethod
@@ -296,8 +304,20 @@ class _V4Bridge(Interface):
             for d in self._provider.get_tx_for_gene(gene)
         ]
 
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
-        return self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
+        return [
+            TranscriptAlignment(
+                tx_ac=d["tx_ac"],
+                alt_ac=d["alt_ac"],
+                alt_aln_method=d["alt_aln_method"],
+                alt_strand=d["alt_strand"],
+                start_i=d["start_i"],
+                end_i=d["end_i"],
+            )
+            for d in self._provider.get_tx_for_region(alt_ac, alt_aln_method, start_i, end_i)
+        ]
 
     def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         result = self._provider.get_tx_identity_info(tx_ac)

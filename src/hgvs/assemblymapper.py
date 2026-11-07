@@ -186,7 +186,7 @@ class AssemblyMapper(VariantMapper):
             s.base,
             e.base,
         )
-        return [e["tx_ac"] for e in tx]
+        return [e.tx_ac for e in tx]
 
     def _alt_ac_for_tx_ac(self, tx_ac):
         """return chromosomal accession for given transcript accession (and

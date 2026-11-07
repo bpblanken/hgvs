@@ -23,7 +23,13 @@ import hgvs
 
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
-from .models import TranscriptExon, TranscriptIdentityInfo, TranscriptInfo, TranscriptMappingOption
+from .models import (
+    TranscriptAlignment,
+    TranscriptExon,
+    TranscriptIdentityInfo,
+    TranscriptInfo,
+    TranscriptMappingOption,
+)
 from .seqfetcher import SeqFetcher
 
 _logger = logging.getLogger(__name__)
@@ -355,7 +361,9 @@ class UTABase(Interface):
             for r in rows
         ]
 
-    def get_tx_for_region(self, alt_ac, alt_aln_method, start_i, end_i):
+    def get_tx_for_region(
+        self, alt_ac: str, alt_aln_method: str, start_i: int, end_i: int
+    ) -> list[TranscriptAlignment]:
         """
         return transcripts that overlap given region
 
@@ -369,7 +377,9 @@ class UTABase(Interface):
             alt_ac=alt_ac, start_i=start_i, end_i=end_i, alt_aln_method=alt_aln_method
         )
 
-    def get_alignments_for_region(self, alt_ac, start_i, end_i, alt_aln_method=None):
+    def get_alignments_for_region(
+        self, alt_ac: str, start_i: int, end_i: int, alt_aln_method: str | None = None
+    ) -> list[TranscriptAlignment]:
         """
         return transcripts that overlap given region
 
@@ -384,7 +394,17 @@ class UTABase(Interface):
         )
         if alt_aln_method is not None:
             alignments = [a for a in alignments if a["alt_aln_method"] == alt_aln_method]
-        return alignments
+        return [
+            TranscriptAlignment(
+                tx_ac=a["tx_ac"],
+                alt_ac=a["alt_ac"],
+                alt_aln_method=a["alt_aln_method"],
+                alt_strand=a["alt_strand"],
+                start_i=a["start_i"],
+                end_i=a["end_i"],
+            )
+            for a in alignments
+        ]
 
     def get_tx_identity_info(self, tx_ac: str) -> TranscriptIdentityInfo:
         """returns features associated with a single transcript.
