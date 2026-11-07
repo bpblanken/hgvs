@@ -125,6 +125,30 @@ class TranscriptAlignment:
     end_i: int
 
 
+@dataclass(frozen=True, slots=True)
+class SimilarTranscript:
+    """How two transcripts compare structurally.
+
+    ``es`` is exon structure, ``fp`` fingerprint, ``eq`` equal.
+
+    :param tx_ac1: the transcript the comparison was made for
+    :param tx_ac2: the transcript it is compared to
+    :param hgnc_eq: same gene symbol
+    :param cds_eq: identical CDS sequences
+    :param es_fp_eq: identical exon structures, UTRs included
+    :param cds_es_fp_eq: identical exon structures clipped to the CDS
+    :param cds_exon_lengths_fp_eq: identical CDS-clipped exon lengths
+    """
+
+    tx_ac1: str
+    tx_ac2: str
+    hgnc_eq: bool
+    cds_eq: bool
+    es_fp_eq: bool
+    cds_es_fp_eq: bool
+    cds_exon_lengths_fp_eq: bool
+
+
 # <LICENSE>
 # Copyright 2018 HGVS Contributors (https://github.com/biocommons/hgvs)
 #

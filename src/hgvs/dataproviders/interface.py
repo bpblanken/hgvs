@@ -11,6 +11,7 @@ from ..decorators.lru_cache import LEARN, RUN, VERIFY, lru_cache
 from ..exceptions import HGVSDataNotAvailableError
 from ..utils.PersistentDict import PersistentDict
 from .models import (
+    SimilarTranscript,
     TranscriptAlignment,
     TranscriptExon,
     TranscriptIdentityInfo,
@@ -191,7 +192,7 @@ class Interface(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def get_similar_transcripts(self, tx_ac):
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
         pass
 
     @abc.abstractmethod
@@ -263,8 +264,19 @@ class _V4Bridge(Interface):
     def get_seq(self, ac, start_i=None, end_i=None):
         return self._provider.get_seq(ac, start_i, end_i)
 
-    def get_similar_transcripts(self, tx_ac):
-        return self._provider.get_similar_transcripts(tx_ac)
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
+        return [
+            SimilarTranscript(
+                tx_ac1=d["tx_ac1"],
+                tx_ac2=d["tx_ac2"],
+                hgnc_eq=d["hgnc_eq"],
+                cds_eq=d["cds_eq"],
+                es_fp_eq=d["es_fp_eq"],
+                cds_es_fp_eq=d["cds_es_fp_eq"],
+                cds_exon_lengths_fp_eq=d["cds_exon_lengths_fp_eq"],
+            )
+            for d in self._provider.get_similar_transcripts(tx_ac)
+        ]
 
     def get_tx_exons(self, tx_ac: str, alt_ac: str, alt_aln_method: str) -> list[TranscriptExon]:
         result = self._provider.get_tx_exons(tx_ac, alt_ac, alt_aln_method)

@@ -24,6 +24,7 @@ import hgvs
 from ..dataproviders.interface import Interface
 from ..exceptions import HGVSDataNotAvailableError, HGVSError
 from .models import (
+    SimilarTranscript,
     TranscriptAlignment,
     TranscriptExon,
     TranscriptIdentityInfo,
@@ -518,17 +519,15 @@ class UTABase(Interface):
             for r in rows
         ]
 
-    def get_similar_transcripts(self, tx_ac):
+    def get_similar_transcripts(self, tx_ac: str) -> list[SimilarTranscript]:
         """Return a list of transcripts that are similar to the given
         transcript, with relevant similarity criteria.
 
         >> sim_tx = hdp.get_similar_transcripts('NM_001285829.1')
-        >> dict(sim_tx[0])
-        { 'cds_eq': False,
-        'cds_es_fp_eq': False,
-        'es_fp_eq': True,
-        'tx_ac1': 'NM_001285829.1',
-        'tx_ac2': 'ENST00000498907' }
+        >> sim_tx[0]
+        SimilarTranscript(tx_ac1='NM_001285829.1', tx_ac2='ENST00000341255',
+                          hgnc_eq=False, cds_eq=False, es_fp_eq=False,
+                          cds_es_fp_eq=False, cds_exon_lengths_fp_eq=True)
 
         where:
 
@@ -548,7 +547,18 @@ class UTABase(Interface):
         """
 
         rows = self._fetchall(self._queries["tx_similar"], [tx_ac])
-        return rows
+        return [
+            SimilarTranscript(
+                tx_ac1=r["tx_ac1"],
+                tx_ac2=r["tx_ac2"],
+                hgnc_eq=r["hgnc_eq"],
+                cds_eq=r["cds_eq"],
+                es_fp_eq=r["es_fp_eq"],
+                cds_es_fp_eq=r["cds_es_fp_eq"],
+                cds_exon_lengths_fp_eq=r["cds_exon_lengths_fp_eq"],
+            )
+            for r in rows
+        ]
 
     def get_pro_ac_for_tx_ac(self, tx_ac):
         """Return the (single) associated protein accession for a given transcript
